@@ -16,6 +16,12 @@ pub struct Loc {
     end: Point,
 }
 
+impl Loc {
+    pub fn new(start: Point, end: Point) -> Self {
+        Self { start, end }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
@@ -44,6 +50,7 @@ pub enum Token {
 
     // Keywords
     Fn,
+    Let,
     For,
     If,
     Else,
@@ -62,30 +69,37 @@ pub struct TokenWithLoc {
     pub loc: Loc,
 }
 
+impl TokenWithLoc {
+    pub fn new(token: Token, loc: Loc) -> Self {
+        Self { token, loc }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Lexer {
     data: Vec<char>,
     index: usize,
     line: usize,
     col: usize,
+    last_point: Point,
 }
 
 impl Lexer {
     pub fn new(data: &str) -> Self {
-        let mut lexer = Lexer {
+        Self {
             data: data.chars().collect(),
             index: 0,
             line: 1,
             col: 1,
-        };
-        lexer.skip_whitespace();
-        lexer
+            last_point: Point { line: 1, col: 1 },
+        }
     }
 
     fn get_char(&mut self) -> Option<char> {
         let Some(&c) = self.data.get(self.index) else {
             return None;
         };
+        self.last_point = self.get_point();
         if c == '\n' {
             self.line += 1;
             self.col = 1;
@@ -108,6 +122,23 @@ impl Lexer {
                 break;
             }
         }
+    }
+
+    fn get_point(&self) -> Point {
+        Point {
+            line: self.line,
+            col: self.col,
+        }
+    }
+
+    fn get_last_point(&self) -> Point {
+        self.last_point
+    }
+
+    fn get_char_with_point(&mut self) -> Option<(char, Point)> {
+        let point = self.get_point();
+        let c = self.get_char()?;
+        Some((c, point))
     }
 }
 
@@ -134,6 +165,7 @@ static OPERATOR_CHARS: LazyLock<HashSet<char>> = LazyLock::new(|| {
 static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
     HashMap::from([
         ("fn", Token::Fn),
+        ("let", Token::Let),
         ("for", Token::For),
         ("if", Token::If),
         ("else", Token::Else),
@@ -153,72 +185,80 @@ static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, PrimitiveType>> =
         ])
     });
 
-fn read_alphabetic(l: &mut Lexer) -> Token {
-    let mut acc = l.get_char().unwrap().to_string();
-    while l.peek_char().is_some() {
-        let c = l.peek_char().unwrap();
+fn read_alphabetic(l: &mut Lexer) -> TokenWithLoc {
+    let (c, start) = l.get_char_with_point().unwrap();
+    let mut acc = c.to_string();
+    let mut end = start;
+    while let Some(c) = l.peek_char() {
         if c.is_alphanumeric() || c == '_' {
             acc.push(l.get_char().unwrap());
         } else {
+            end = l.get_last_point();
             break;
         }
     }
-    if let Some(token) = KEYWORDS.get(acc.as_str()) {
+    let token = if let Some(token) = KEYWORDS.get(acc.as_str()) {
         token.clone()
     } else if let Some(&prim) = PRIMITIVE_TYPES.get(acc.as_str()) {
         Token::Type(prim)
     } else {
         Token::Id(acc)
-    }
+    };
+    TokenWithLoc::new(token, Loc::new(start, end))
 }
 
-fn read_numeric_literal(l: &mut Lexer) -> Token {
-    let mut acc = l.get_char().unwrap().to_string();
-    while l.peek_char().is_some() {
-        let c = l.peek_char().unwrap();
+fn read_numeric_literal(l: &mut Lexer) -> TokenWithLoc {
+    let (c, start) = l.get_char_with_point().unwrap();
+    let mut acc = c.to_string();
+    let mut end = start;
+    while let Some(c) = l.peek_char() {
         if c.is_alphanumeric() || c == '_' || c == '.' {
             acc.push(l.get_char().unwrap());
         } else {
+            end = l.get_last_point();
             break;
         }
     }
-    Token::NumLit(acc)
+    TokenWithLoc::new(Token::NumLit(acc), Loc::new(start, end))
 }
 
-fn read_string_literal(l: &mut Lexer) -> Token {
-    let _ = l.get_char().unwrap();
+fn read_string_literal(l: &mut Lexer) -> TokenWithLoc {
+    let (_, start) = l.get_char_with_point().unwrap();
     let mut acc = String::new();
-    while l.peek_char().is_some() {
-        let c = l.peek_char().unwrap();
+    let mut end = start;
+    while let Some(c) = l.peek_char() {
         if c != '"' {
             acc.push(l.get_char().unwrap());
         } else {
-            let _ = l.get_char().unwrap();
+            (_, end) = l.get_char_with_point().unwrap();
             break;
         }
     }
-    Token::StrLit(acc)
+    TokenWithLoc::new(Token::StrLit(acc), Loc::new(start, end))
 }
 
-fn read_operator(l: &mut Lexer) -> Token {
-    let mut acc = l.get_char().unwrap().to_string();
+fn read_operator(l: &mut Lexer) -> TokenWithLoc {
+    let (c, start) = l.get_char_with_point().unwrap();
+    let mut acc = c.to_string();
+    let mut end = start;
     while l.peek_char().is_some() {
         let c = l.peek_char().unwrap();
         if OPERATOR_CHARS.contains(&c) {
             acc.push(l.get_char().unwrap());
         } else {
+            end = l.get_last_point();
             break;
         }
     }
-    Token::Op(acc)
+    TokenWithLoc::new(Token::Op(acc), Loc::new(start, end))
 }
 
-fn get_next_token(l: &mut Lexer) -> Option<Token> {
+fn get_next_token(l: &mut Lexer) -> Option<TokenWithLoc> {
     l.skip_whitespace();
     let next = l.peek_char()?;
     if let Some(token) = SINGLE_CHAR_TOKENS.get(&next) {
-        l.get_char();
-        Some(token.clone())
+        let (_, p) = l.get_char_with_point().unwrap();
+        Some(TokenWithLoc::new(token.clone(), Loc::new(p, p)))
     } else if next.is_alphabetic() || next == '_' {
         Some(read_alphabetic(l))
     } else if next.is_numeric() {
@@ -230,8 +270,9 @@ fn get_next_token(l: &mut Lexer) -> Option<Token> {
     }
 }
 
-pub fn tokenize_string(s: &str) -> Vec<Token> {
+pub fn tokenize_string(s: &str) -> Vec<TokenWithLoc> {
     let mut l = Lexer::new(s);
+    l.skip_whitespace();
     let mut tokens = Vec::new();
     while let Some(token) = get_next_token(&mut l) {
         tokens.push(token);
