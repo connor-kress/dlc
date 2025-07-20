@@ -1,27 +1,35 @@
 #[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
 pub struct Point {
     line: usize,
     col: usize,
 }
 
-pub enum Loc {
-    Point(Point),
-    Span { start: Point, end: Point },
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Loc {
+    // file_name: String,
+    start: Point,
+    end: Point,
 }
 
+#[derive(Debug, Clone)]
 pub enum Type {} // TODO
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct Block {
     body: Vec<Expr>,
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct ParamList {
-    params: Vec<(Symbol, Type)>,
+    params: Vec<(String, Type)>,
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone)]
 pub struct Function {
     param_list: ParamList,
     ret_type: Type,
@@ -29,31 +37,13 @@ pub struct Function {
 }
 
 #[allow(dead_code)]
-pub struct Symbol {
-    val: String,
-}
-
-pub enum Expr {
-    Symbol(Symbol),
-    Block(Block),
-    Function(Function),
-    Uniop {
-        op: Uniop,
-        arg: Box<Expr>,
-    },
-    Binop {
-        op: Binop,
-        left: Box<Expr>,
-        right: Box<Expr>,
-    },
+#[derive(Debug, Clone)]
+pub enum Statement {
+    Expr(Expr),
     VarDecl {
-        name: Symbol,
+        name: String,
         type_: Option<Type>,
         val: Option<Box<Expr>>,
-    },
-    FuncCall {
-        name: Box<Expr>,
-        args: Vec<Expr>,
     },
     Loop {
         body: Box<Expr>,
@@ -74,6 +64,29 @@ pub enum Expr {
     Continue,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum Expr {
+    Id(String),
+    Block(Block),
+    Function(Function),
+    Uniop {
+        op: Uniop,
+        arg: Box<Expr>,
+    },
+    Binop {
+        op: Binop,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    FuncCall {
+        name: Box<Expr>,
+        args: Vec<Expr>,
+    },
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Uniop {
     Lnot,
     Neg,
@@ -82,6 +95,8 @@ pub enum Uniop {
     Deref,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Binop {
     Assign,
     Eq,
