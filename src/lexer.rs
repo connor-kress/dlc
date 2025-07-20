@@ -1,9 +1,23 @@
 use std::collections::{HashMap, HashSet};
-use std::iter::Peekable;
 use std::sync::LazyLock;
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
+    line: usize,
+    col: usize,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct Loc {
+    // file_name: String,
+    start: Point,
+    end: Point,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
     Int,
     Float,
@@ -39,6 +53,62 @@ pub enum Token {
     // Literals
     StrLit(String),
     NumLit(String),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TokenWithLoc {
+    pub token: Token,
+    pub loc: Loc,
+}
+
+#[derive(Debug, Clone)]
+pub struct Lexer {
+    data: Vec<char>,
+    index: usize,
+    line: usize,
+    col: usize,
+}
+
+impl Lexer {
+    pub fn new(data: &str) -> Self {
+        let mut lexer = Lexer {
+            data: data.chars().collect(),
+            index: 0,
+            line: 1,
+            col: 1,
+        };
+        lexer.skip_whitespace();
+        lexer
+    }
+
+    fn get_char(&mut self) -> Option<char> {
+        let Some(&c) = self.data.get(self.index) else {
+            return None;
+        };
+        if c == '\n' {
+            self.line += 1;
+            self.col = 1;
+        } else {
+            self.col += 1;
+        }
+        self.index += 1;
+        Some(c)
+    }
+
+    fn peek_char(&mut self) -> Option<char> {
+        self.data.get(self.index).copied()
+    }
+
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek_char() {
+            if c.is_whitespace() {
+                self.get_char();
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 static SINGLE_CHAR_TOKENS: LazyLock<HashMap<char, Token>> =
@@ -83,35 +153,31 @@ static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, PrimitiveType>> =
         ])
     });
 
-fn read_alphabetic<It: Iterator<Item = char>>(
-    data: &mut Peekable<It>,
-) -> Token {
-    let mut acc = data.next().unwrap().to_string();
-    while data.peek().is_some() {
-        let c = data.peek().unwrap();
-        if c.is_alphanumeric() || *c == '_' {
-            acc.push(data.next().unwrap());
+fn read_alphabetic(l: &mut Lexer) -> Token {
+    let mut acc = l.get_char().unwrap().to_string();
+    while l.peek_char().is_some() {
+        let c = l.peek_char().unwrap();
+        if c.is_alphanumeric() || c == '_' {
+            acc.push(l.get_char().unwrap());
         } else {
             break;
         }
     }
     if let Some(token) = KEYWORDS.get(acc.as_str()) {
         token.clone()
-    } else if let Some(prim) = PRIMITIVE_TYPES.get(acc.as_str()) {
-        Token::Type(prim.clone())
+    } else if let Some(&prim) = PRIMITIVE_TYPES.get(acc.as_str()) {
+        Token::Type(prim)
     } else {
         Token::Id(acc)
     }
 }
 
-fn read_numeric_literal<It: Iterator<Item = char>>(
-    data: &mut Peekable<It>,
-) -> Token {
-    let mut acc = data.next().unwrap().to_string();
-    while data.peek().is_some() {
-        let c = data.peek().unwrap();
-        if c.is_alphanumeric() || *c == '_' || *c == '.' {
-            acc.push(data.next().unwrap());
+fn read_numeric_literal(l: &mut Lexer) -> Token {
+    let mut acc = l.get_char().unwrap().to_string();
+    while l.peek_char().is_some() {
+        let c = l.peek_char().unwrap();
+        if c.is_alphanumeric() || c == '_' || c == '.' {
+            acc.push(l.get_char().unwrap());
         } else {
             break;
         }
@@ -119,29 +185,27 @@ fn read_numeric_literal<It: Iterator<Item = char>>(
     Token::NumLit(acc)
 }
 
-fn read_string_literal<It: Iterator<Item = char>>(
-    data: &mut Peekable<It>,
-) -> Token {
-    let _ = data.next().unwrap();
+fn read_string_literal(l: &mut Lexer) -> Token {
+    let _ = l.get_char().unwrap();
     let mut acc = String::new();
-    while data.peek().is_some() {
-        let c = data.peek().unwrap();
-        if *c != '"' {
-            acc.push(data.next().unwrap());
+    while l.peek_char().is_some() {
+        let c = l.peek_char().unwrap();
+        if c != '"' {
+            acc.push(l.get_char().unwrap());
         } else {
-            let _ = data.next().unwrap();
+            let _ = l.get_char().unwrap();
             break;
         }
     }
     Token::StrLit(acc)
 }
 
-fn read_operator<It: Iterator<Item = char>>(data: &mut Peekable<It>) -> Token {
-    let mut acc = data.next().unwrap().to_string();
-    while data.peek().is_some() {
-        let c = data.peek().unwrap();
-        if OPERATOR_CHARS.contains(c) {
-            acc.push(data.next().unwrap());
+fn read_operator(l: &mut Lexer) -> Token {
+    let mut acc = l.get_char().unwrap().to_string();
+    while l.peek_char().is_some() {
+        let c = l.peek_char().unwrap();
+        if OPERATOR_CHARS.contains(&c) {
+            acc.push(l.get_char().unwrap());
         } else {
             break;
         }
@@ -149,31 +213,27 @@ fn read_operator<It: Iterator<Item = char>>(data: &mut Peekable<It>) -> Token {
     Token::Op(acc)
 }
 
-fn get_next_token<It: Iterator<Item = char>>(
-    data: &mut Peekable<It>,
-) -> Option<Token> {
-    while data.peek()?.is_whitespace() {
-        let _ = data.next();
-    }
-    let next = data.peek()?;
-    if let Some(token) = SINGLE_CHAR_TOKENS.get(next) {
-        let _ = data.next();
+fn get_next_token(l: &mut Lexer) -> Option<Token> {
+    l.skip_whitespace();
+    let next = l.peek_char()?;
+    if let Some(token) = SINGLE_CHAR_TOKENS.get(&next) {
+        l.get_char();
         Some(token.clone())
-    } else if next.is_alphabetic() || *next == '_' {
-        Some(read_alphabetic(data))
+    } else if next.is_alphabetic() || next == '_' {
+        Some(read_alphabetic(l))
     } else if next.is_numeric() {
-        Some(read_numeric_literal(data))
-    } else if *next == '"' {
-        Some(read_string_literal(data))
+        Some(read_numeric_literal(l))
+    } else if next == '"' {
+        Some(read_string_literal(l))
     } else {
-        Some(read_operator(data))
+        Some(read_operator(l))
     }
 }
 
 pub fn tokenize_string(s: &str) -> Vec<Token> {
-    let mut data = s.chars().peekable();
+    let mut l = Lexer::new(s);
     let mut tokens = Vec::new();
-    while let Some(token) = get_next_token(&mut data) {
+    while let Some(token) = get_next_token(&mut l) {
         tokens.push(token);
     }
     tokens

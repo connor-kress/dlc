@@ -1,18 +1,3 @@
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
-pub struct Point {
-    line: usize,
-    col: usize,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub struct Loc {
-    // file_name: String,
-    start: Point,
-    end: Point,
-}
-
 #[derive(Debug, Clone)]
 pub enum Type {} // TODO
 
