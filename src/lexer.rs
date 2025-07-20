@@ -11,9 +11,9 @@ pub struct Point {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Loc {
-    // file_name: String,
-    start: Point,
-    end: Point,
+    // pub file_name: String,
+    pub start: Point,
+    pub end: Point,
 }
 
 impl Loc {

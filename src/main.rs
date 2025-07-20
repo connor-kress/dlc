@@ -16,7 +16,7 @@ fn main(argc: int, argv: char) -> int {
 
 #[allow(dead_code)]
 static PROGRAM_FUNCTION_HEADER: &str = r#"
-fn main() -> int {}
+fn main(argc: int, argv: char) -> int {}
 "#;
 
 fn main() -> Result<(), String> {

@@ -40,6 +40,7 @@ pub struct Function {
     pub param_list: ParamList,
     pub ret_type: TypeWithLoc,
     pub body: Box<Statement>,
+    pub loc: Loc,
 }
 
 // This is temporary, everything should be an expression

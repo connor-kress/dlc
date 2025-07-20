@@ -1,6 +1,6 @@
 use crate::{
     ast::{Function, IdWithLoc, ParamList, Statement, Type, TypeWithLoc},
-    lexer::{PrimitiveType, Token, TokenWithLoc},
+    lexer::{Loc, PrimitiveType, Token, TokenWithLoc},
 };
 
 struct Parser {
@@ -16,28 +16,40 @@ impl Parser {
         }
     }
 
-    fn peek_optional_token(&self) -> Option<&TokenWithLoc> {
+    fn at_end(&self) -> bool {
+        self.current_token >= self.tokens.len()
+    }
+
+    fn peek_optional_token(&self) -> Option<TokenWithLoc> {
         if self.current_token >= self.tokens.len() {
             return None;
         }
-        Some(&self.tokens[self.current_token])
+        Some(self.tokens[self.current_token].clone())
     }
 
-    fn peek_token(&self) -> Result<&TokenWithLoc, String> {
+    fn peek_token(&self) -> Result<TokenWithLoc, String> {
         self.peek_optional_token()
             .ok_or_else(|| "Unexpected end of program".into())
     }
 
     fn get_token(&mut self) -> Result<TokenWithLoc, String> {
-        let token = self.peek_token()?.clone();
+        let token = self.peek_token()?;
         self.current_token += 1;
         Ok(token)
     }
 
+    fn advance(&mut self) -> Result<(), String> {
+        if self.current_token >= self.tokens.len() {
+            return Err("Unexpected end of program".into());
+        }
+        self.current_token += 1;
+        Ok(())
+    }
+
     fn expect_token(&mut self, token: Token) -> Result<TokenWithLoc, String> {
-        let peek = self
-            .peek_token()
-            .map_err(|_| format!("Expected {:?}, got end of program", token))?;
+        let peek = self.peek_optional_token().ok_or_else(|| {
+            format!("Expected {:?}, got end of program", token)
+        })?;
         if peek.token != token {
             return Err(format!("Expected {:?}, got {:?}", token, peek));
         }
@@ -45,68 +57,94 @@ impl Parser {
     }
 
     fn expect_id(&mut self) -> Result<IdWithLoc, String> {
-        let peek = self
-            .peek_token()
-            .map_err(|_| "Expected identifier, got end of program".to_string())?
-            .clone();
+        let peek = self.peek_optional_token().ok_or_else(|| {
+            "Expected identifier, got end of program".to_string()
+        })?;
         if let Token::Id(id) = peek.token {
-            self.get_token().unwrap();
+            self.advance().unwrap();
             Ok(IdWithLoc { id, loc: peek.loc })
         } else {
-            return Err(format!("Expected identifier, got {:?}", peek));
+            return Err(format!("Expected identifier, got {:?}", peek.token));
         }
     }
 }
 
-fn parse_function(parser: &mut Parser) -> Result<Function, String> {
-    parser.expect_token(Token::Fn)?;
-    let name = parser.expect_id()?;
-    parser.expect_token(Token::Lparen)?;
-    let params = Vec::<(IdWithLoc, TypeWithLoc)>::new(); // TODO
-    parser.expect_token(Token::Rparen)?;
-    let peek = parser.peek_token()?.clone();
+fn parse_type(p: &mut Parser) -> Result<TypeWithLoc, String> {
+    let type_token = p
+        .peek_optional_token()
+        .ok_or_else(|| "Expected type, got end of program".to_string())?;
+    let type_ = match type_token.token {
+        Token::Type(ty) => Type::Primitive(ty),
+        Token::Id(id) => Type::Id(id),
+        _ => {
+            return Err(format!("Expected type, got {:?}", type_token.token));
+        }
+    };
+    p.advance().unwrap();
+    Ok(TypeWithLoc::new(type_, type_token.loc))
+}
+
+fn parse_function(p: &mut Parser) -> Result<Function, String> {
+    let fn_start = p.expect_token(Token::Fn)?.loc.start;
+    let name = p.expect_id()?;
+    p.expect_token(Token::Lparen)?;
+    let mut params = Vec::<(IdWithLoc, TypeWithLoc)>::new();
+    let mut first = true;
+    while p.peek_token()?.token != Token::Rparen {
+        if !first && p.peek_token().unwrap().token == Token::Comma {
+            p.advance().unwrap();
+        }
+        if p.peek_token().unwrap().token == Token::Rparen {
+            break;
+        }
+        first = false;
+        let id = p.expect_id()?;
+        p.expect_token(Token::Colon)?;
+        let type_ = parse_type(p)?;
+        params.push((id, type_));
+    }
+    p.expect_token(Token::Rparen)?;
+    let peek = p.peek_token()?;
     let ret_type = match peek.token {
         Token::Op(op) => {
             if op != "->" {
-                return Err("Expected '->' or '{' after parameter list".into());
+                return Err(format!(
+                    "Expected '->' or '{{' after parameter list, got {:?}",
+                    Token::Op(op),
+                ));
             }
-            parser.get_token().unwrap();
-            let type_token = parser.peek_token()?.clone();
-            let ret_type = match type_token.token {
-                Token::Type(ty) => Type::Primitive(ty),
-                Token::Id(id) => Type::Id(id.clone()),
-                _ => {
-                    return Err("Expected type after '->'".into());
-                }
-            };
-            parser.get_token().unwrap();
-            TypeWithLoc::new(ret_type, type_token.loc)
+            p.advance().unwrap();
+            parse_type(p)?
         }
         Token::Lcurly => {
             TypeWithLoc::new(Type::Primitive(PrimitiveType::Void), peek.loc)
         }
-        _ => {
-            return Err("Expected '->' or '{' after parameter list".into());
+        t => {
+            return Err(format!(
+                "Expected '->' or '{{' after parameter list, got {:?}",
+                t,
+            ));
         }
     };
-    parser.expect_token(Token::Lcurly)?;
+    p.expect_token(Token::Lcurly)?;
     let body = Vec::<Statement>::new(); // TODO
-    parser.expect_token(Token::Rcurly)?;
+    let fn_end = p.expect_token(Token::Rcurly)?.loc.end;
     Ok(Function {
         name,
         param_list: ParamList { params },
         ret_type,
         body: Box::new(Statement::Block(body)),
+        loc: Loc::new(fn_start, fn_end),
     })
 }
 
 pub fn parse_program(
     tokens: Vec<TokenWithLoc>,
 ) -> Result<Vec<Function>, String> {
-    let mut parser = Parser::new(tokens);
+    let mut p = Parser::new(tokens);
     let mut functions = Vec::new();
-    while parser.current_token < parser.tokens.len() {
-        let function = parse_function(&mut parser)?;
+    while !p.at_end() {
+        let function = parse_function(&mut p)?;
         functions.push(function);
     }
     Ok(functions)
