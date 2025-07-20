@@ -42,6 +42,7 @@ pub enum Token {
     Lcurly,
     Rcurly,
     Comma,
+    Colon,
     Semi,
 
     Type(PrimitiveType),
@@ -152,6 +153,7 @@ static SINGLE_CHAR_TOKENS: LazyLock<HashMap<char, Token>> =
             ('{', Token::Lcurly),
             ('}', Token::Rcurly),
             (',', Token::Comma),
+            (':', Token::Colon),
             (';', Token::Semi),
         ])
     });

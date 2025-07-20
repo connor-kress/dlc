@@ -1,30 +1,53 @@
-#[derive(Debug, Clone)]
-pub enum Type {} // TODO
+use crate::lexer::{Loc, PrimitiveType};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct Block {
-    body: Vec<Expr>,
+pub struct IdWithLoc {
+    pub id: String,
+    pub loc: Loc,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub enum Type {
+    Primitive(PrimitiveType),
+    Id(String),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct TypeWithLoc {
+    pub type_: Type,
+    pub loc: Loc,
+}
+
+impl TypeWithLoc {
+    pub fn new(type_: Type, loc: Loc) -> Self {
+        Self { type_, loc }
+    }
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ParamList {
-    params: Vec<(String, Type)>,
+    pub params: Vec<(IdWithLoc, TypeWithLoc)>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Function {
-    param_list: ParamList,
-    ret_type: Type,
-    body: Box<Expr>,
+    pub name: IdWithLoc,
+    pub param_list: ParamList,
+    pub ret_type: TypeWithLoc,
+    pub body: Box<Statement>,
 }
 
+// This is temporary, everything should be an expression
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(Expr),
+    Block(Vec<Statement>),
     VarDecl {
         name: String,
         type_: Option<Type>,
@@ -53,8 +76,6 @@ pub enum Statement {
 #[derive(Debug, Clone)]
 pub enum Expr {
     Id(String),
-    Block(Block),
-    Function(Function),
     Uniop {
         op: Uniop,
         arg: Box<Expr>,
