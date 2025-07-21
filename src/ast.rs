@@ -39,7 +39,7 @@ pub struct Function {
     pub name: IdWithLoc,
     pub param_list: ParamList,
     pub ret_type: TypeWithLoc,
-    pub body: Box<Statement>,
+    pub body: Vec<StatementWithLoc>,
     pub loc: Loc,
 }
 
@@ -47,36 +47,51 @@ pub struct Function {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Statement {
-    Expr(Expr),
+    Expr(ExprWithLoc),
     Block(Vec<Statement>),
     VarDecl {
         name: String,
         type_: Option<Type>,
-        val: Option<Box<Expr>>,
+        val: Option<Box<ExprWithLoc>>,
     },
     Loop {
-        body: Box<Expr>,
+        body: Box<StatementWithLoc>,
     },
     WhileLoop {
-        pred: Box<Expr>,
-        body: Box<Expr>,
+        pred: Box<ExprWithLoc>,
+        body: Box<StatementWithLoc>,
     },
     ForLoop {
-        start: Box<Expr>,
-        pred: Box<Expr>,
-        step: Box<Expr>,
-        body: Box<Expr>,
+        start: Box<ExprWithLoc>,
+        pred: Box<ExprWithLoc>,
+        step: Box<ExprWithLoc>,
+        body: Box<StatementWithLoc>,
     },
     Break {
-        val: Option<Box<Expr>>,
+        val: Option<Box<ExprWithLoc>>,
     },
     Continue,
+}
+
+#[derive(Debug, Clone)]
+pub struct StatementWithLoc {
+    pub statement: Statement,
+    pub loc: Loc,
+}
+
+impl StatementWithLoc {
+    pub fn new(statement: Statement, loc: Loc) -> Self {
+        Self { statement, loc }
+    }
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Expr {
     Id(String),
+    IntLit(i32),
+    FloatLit(f64),
+    StrLit(String),
     Uniop {
         op: Uniop,
         arg: Box<Expr>,
@@ -90,6 +105,18 @@ pub enum Expr {
         name: Box<Expr>,
         args: Vec<Expr>,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct ExprWithLoc {
+    pub expr: Expr,
+    pub loc: Loc,
+}
+
+impl ExprWithLoc {
+    pub fn new(expr: Expr, loc: Loc) -> Self {
+        Self { expr, loc }
+    }
 }
 
 #[allow(dead_code)]

@@ -16,7 +16,7 @@ fn main(argc: int, argv: char) -> int {
 
 #[allow(dead_code)]
 static PROGRAM_FUNCTION_HEADER: &str = r#"
-fn main(argc: int, argv: char) -> int {}
+fn main(argc: int, argv: char) -> int {5; "okay"; hello;}
 "#;
 
 fn main() -> Result<(), String> {
@@ -28,6 +28,6 @@ fn main() -> Result<(), String> {
         .collect::<Vec<_>>();
     println!("{:?}", raw_tokens);
     let functions = parse_program(tokens)?;
-    println!("{:?}", functions);
+    println!("{:?}", functions[0].body);
     Ok(())
 }

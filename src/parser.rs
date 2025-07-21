@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Function, IdWithLoc, ParamList, Statement, Type, TypeWithLoc},
+    ast::{
+        Expr, ExprWithLoc, Function, IdWithLoc, ParamList, Statement,
+        StatementWithLoc, Type, TypeWithLoc,
+    },
     lexer::{Loc, PrimitiveType, Token, TokenWithLoc},
 };
 
@@ -69,6 +72,46 @@ impl Parser {
     }
 }
 
+fn parse_numeric_literal(num_str: &str) -> Result<Expr, String> {
+    if num_str.contains('.') {
+        let num = num_str
+            .parse::<f64>()
+            .map_err(|_| format!("Invalid float literal: {}", num_str))?;
+        Ok(Expr::FloatLit(num))
+    } else {
+        let num = num_str
+            .parse::<i32>()
+            .map_err(|_| format!("Invalid integer literal: {}", num_str))?;
+        Ok(Expr::IntLit(num))
+    }
+}
+
+fn parse_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
+    let peek = p
+        .peek_optional_token()
+        .ok_or_else(|| "Expected expression, got end of program".to_string())?;
+    let expr = match peek.token {
+        Token::Id(id) => Expr::Id(id),
+        Token::NumLit(i) => parse_numeric_literal(&i)?,
+        Token::StrLit(s) => Expr::StrLit(s),
+        _ => {
+            return Err(format!("Expected expression, got {:?}", peek.token));
+        }
+    };
+    p.advance().unwrap();
+    Ok(ExprWithLoc::new(expr, peek.loc))
+}
+
+fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
+    let expr = parse_expression(p)?;
+    let expr_start = expr.loc.start;
+    let expr_end = p.expect_token(Token::Semi)?.loc.end;
+    Ok(StatementWithLoc::new(
+        Statement::Expr(expr),
+        Loc::new(expr_start, expr_end),
+    ))
+}
+
 fn parse_type(p: &mut Parser) -> Result<TypeWithLoc, String> {
     let type_token = p
         .peek_optional_token()
@@ -119,21 +162,28 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
         Token::Lcurly => {
             TypeWithLoc::new(Type::Primitive(PrimitiveType::Void), peek.loc)
         }
-        t => {
+        _ => {
             return Err(format!(
                 "Expected '->' or '{{' after parameter list, got {:?}",
-                t,
+                peek.token,
             ));
         }
     };
     p.expect_token(Token::Lcurly)?;
-    let body = Vec::<Statement>::new(); // TODO
+    let mut body = Vec::new();
+    loop {
+        let statement = parse_statement(p)?;
+        body.push(statement);
+        if p.peek_token()?.token == Token::Rcurly {
+            break;
+        }
+    }
     let fn_end = p.expect_token(Token::Rcurly)?.loc.end;
     Ok(Function {
         name,
         param_list: ParamList { params },
         ret_type,
-        body: Box::new(Statement::Block(body)),
+        body,
         loc: Loc::new(fn_start, fn_end),
     })
 }
