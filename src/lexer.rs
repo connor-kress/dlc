@@ -44,9 +44,11 @@ pub enum Token {
     Comma,
     Colon,
     Semi,
+    ThinArrow,
 
     Type(PrimitiveType),
-    Op(String),
+    Binop(Binop),
+    Uniop(Uniop),
     Id(String),
 
     // Keywords
@@ -61,6 +63,38 @@ pub enum Token {
     // Literals
     StrLit(String),
     NumLit(String),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Uniop {
+    Lnot,
+    Neg,
+    BitNeg,
+    Ref,
+    Deref,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Binop {
+    Assign,
+    Eq,
+    Neq,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Lor,
+    Land,
+    BitOr,
+    BitAnd,
+    BitXor,
+    In, // for iters
 }
 
 #[allow(dead_code)]
@@ -176,6 +210,39 @@ static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
     ])
 });
 
+static BINARY_OPS: LazyLock<HashMap<&'static str, Binop>> =
+    LazyLock::new(|| {
+        HashMap::from([
+            ("+", Binop::Add),
+            ("-", Binop::Sub),
+            ("*", Binop::Mul),
+            ("/", Binop::Div),
+            ("||", Binop::Lor),
+            ("&&", Binop::Land),
+            ("|", Binop::BitOr),
+            ("&", Binop::BitAnd),
+            ("^", Binop::BitXor),
+            ("=", Binop::Assign),
+            ("<", Binop::Lt),
+            ("<=", Binop::Le),
+            (">", Binop::Gt),
+            (">=", Binop::Ge),
+            ("==", Binop::Eq),
+            ("!=", Binop::Neq),
+        ])
+    });
+
+static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
+    LazyLock::new(|| {
+        HashMap::from([
+            ("!", Uniop::Lnot),
+            // ("-", Uniop::Neg), // will initially lex to binop minus
+            ("~", Uniop::BitNeg),
+            ("&", Uniop::Ref),
+            ("*", Uniop::Deref),
+        ])
+    });
+
 static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, PrimitiveType>> =
     LazyLock::new(|| {
         HashMap::from([
@@ -239,7 +306,7 @@ fn read_string_literal(l: &mut Lexer) -> TokenWithLoc {
     TokenWithLoc::new(Token::StrLit(acc), Loc::new(start, end))
 }
 
-fn read_operator(l: &mut Lexer) -> TokenWithLoc {
+fn read_operator(l: &mut Lexer) -> Result<TokenWithLoc, String> {
     let (c, start) = l.get_char_with_point().unwrap();
     let mut acc = c.to_string();
     let mut end = start;
@@ -252,32 +319,44 @@ fn read_operator(l: &mut Lexer) -> TokenWithLoc {
             break;
         }
     }
-    TokenWithLoc::new(Token::Op(acc), Loc::new(start, end))
-}
-
-fn get_next_token(l: &mut Lexer) -> Option<TokenWithLoc> {
-    l.skip_whitespace();
-    let next = l.peek_char()?;
-    if let Some(token) = SINGLE_CHAR_TOKENS.get(&next) {
-        let (_, p) = l.get_char_with_point().unwrap();
-        Some(TokenWithLoc::new(token.clone(), Loc::new(p, p)))
-    } else if next.is_alphabetic() || next == '_' {
-        Some(read_alphabetic(l))
-    } else if next.is_numeric() {
-        Some(read_numeric_literal(l))
-    } else if next == '"' {
-        Some(read_string_literal(l))
+    let token = if acc == "->" {
+        Token::ThinArrow
+    } else if let Some(token) = BINARY_OPS.get(acc.as_str()) {
+        Token::Binop(*token)
+    } else if let Some(token) = UNARY_OPS.get(acc.as_str()) {
+        Token::Uniop(*token)
     } else {
-        Some(read_operator(l))
-    }
+        return Err(format!("Invalid operator: {}", acc));
+    };
+    Ok(TokenWithLoc::new(token, Loc::new(start, end)))
 }
 
-pub fn tokenize_string(s: &str) -> Vec<TokenWithLoc> {
+fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
+    l.skip_whitespace();
+    let Some(next) = l.peek_char() else {
+        return Ok(None);
+    };
+    let token = if let Some(token) = SINGLE_CHAR_TOKENS.get(&next) {
+        let (_, p) = l.get_char_with_point().unwrap();
+        TokenWithLoc::new(token.clone(), Loc::new(p, p))
+    } else if next.is_alphabetic() || next == '_' {
+        read_alphabetic(l)
+    } else if next.is_numeric() {
+        read_numeric_literal(l)
+    } else if next == '"' {
+        read_string_literal(l)
+    } else {
+        read_operator(l)?
+    };
+    Ok(Some(token))
+}
+
+pub fn tokenize_string(s: &str) -> Result<Vec<TokenWithLoc>, String> {
     let mut l = Lexer::new(s);
     l.skip_whitespace();
     let mut tokens = Vec::new();
-    while let Some(token) = get_next_token(&mut l) {
+    while let Some(token) = get_next_token(&mut l)? {
         tokens.push(token);
     }
-    tokens
+    Ok(tokens)
 }

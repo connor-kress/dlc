@@ -8,26 +8,36 @@ use crate::{
 
 struct Parser {
     tokens: Vec<TokenWithLoc>,
-    current_token: usize,
+    token_index: usize,
 }
 
+#[allow(dead_code)]
 impl Parser {
     fn new(tokens: Vec<TokenWithLoc>) -> Self {
         Self {
             tokens,
-            current_token: 0,
+            token_index: 0,
         }
+    }
+
+    fn get_parse_point(&self) -> usize {
+        self.token_index
+    }
+
+    fn set_parse_point(&mut self, parse_point: usize) {
+        assert!(parse_point < self.tokens.len());
+        self.token_index = parse_point;
     }
 
     fn at_end(&self) -> bool {
-        self.current_token >= self.tokens.len()
+        self.token_index >= self.tokens.len()
     }
 
     fn peek_optional_token(&self) -> Option<TokenWithLoc> {
-        if self.current_token >= self.tokens.len() {
+        if self.token_index >= self.tokens.len() {
             return None;
         }
-        Some(self.tokens[self.current_token].clone())
+        Some(self.tokens[self.token_index].clone())
     }
 
     fn peek_token(&self) -> Result<TokenWithLoc, String> {
@@ -37,15 +47,15 @@ impl Parser {
 
     fn get_token(&mut self) -> Result<TokenWithLoc, String> {
         let token = self.peek_token()?;
-        self.current_token += 1;
+        self.token_index += 1;
         Ok(token)
     }
 
     fn advance(&mut self) -> Result<(), String> {
-        if self.current_token >= self.tokens.len() {
+        if self.token_index >= self.tokens.len() {
             return Err("Unexpected end of program".into());
         }
-        self.current_token += 1;
+        self.token_index += 1;
         Ok(())
     }
 
@@ -149,13 +159,7 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
     p.expect_token(Token::Rparen)?;
     let peek = p.peek_token()?;
     let ret_type = match peek.token {
-        Token::Op(op) => {
-            if op != "->" {
-                return Err(format!(
-                    "Expected '->' or '{{' after parameter list, got {:?}",
-                    Token::Op(op),
-                ));
-            }
+        Token::ThinArrow => {
             p.advance().unwrap();
             parse_type(p)?
         }

@@ -1,4 +1,4 @@
-use crate::lexer::{Loc, PrimitiveType};
+use crate::lexer::{Binop, Loc, PrimitiveType, Uniop};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -73,6 +73,7 @@ pub enum Statement {
     Continue,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct StatementWithLoc {
     pub statement: Statement,
@@ -107,6 +108,7 @@ pub enum Expr {
     },
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ExprWithLoc {
     pub expr: Expr,
@@ -117,36 +119,4 @@ impl ExprWithLoc {
     pub fn new(expr: Expr, loc: Loc) -> Self {
         Self { expr, loc }
     }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Uniop {
-    Lnot,
-    Neg,
-    BitNeg,
-    Ref,
-    Deref,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Binop {
-    Assign,
-    Eq,
-    Neq,
-    Lt,
-    Le,
-    Gt,
-    Ge,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Lor,
-    Land,
-    BitOr,
-    BitAnd,
-    BitXor,
-    In, // for iters
 }

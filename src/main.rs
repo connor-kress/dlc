@@ -20,7 +20,7 @@ fn main(argc: int, argv: char) -> int {5; "okay"; hello;}
 "#;
 
 fn main() -> Result<(), String> {
-    let tokens = tokenize_string(PROGRAM_FUNCTION_HEADER);
+    let tokens = tokenize_string(PROGRAM_FUNCTION_HEADER)?;
     let raw_tokens = tokens
         .clone()
         .into_iter()
