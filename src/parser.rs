@@ -3,8 +3,34 @@ use crate::{
         Expr, ExprWithLoc, Function, IdWithLoc, ParamList, Statement,
         StatementWithLoc, Type, TypeWithLoc,
     },
-    lexer::{Loc, PrimitiveType, Token, TokenWithLoc},
+    lexer::{Binop, Loc, PrimitiveType, Token, TokenWithLoc, Uniop},
 };
+
+#[allow(dead_code)]
+impl Binop {
+    // https://en.cppreference.com/w/c/language/operator_precedence.html
+    fn precedence(&self) -> usize {
+        match self {
+            Binop::Mul | Binop::Div => 3,
+            Binop::Add | Binop::Sub => 4,
+            Binop::Lt | Binop::Le | Binop::Gt | Binop::Ge => 6,
+            Binop::Eq | Binop::Neq => 7,
+            Binop::BitAnd => 8,
+            Binop::BitXor => 9,
+            Binop::BitOr => 10,
+            Binop::Land => 11,
+            Binop::Lor => 12,
+            Binop::Assign => 14,
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl Uniop {
+    fn precedence(&self) -> usize {
+        2
+    }
+}
 
 struct Parser {
     tokens: Vec<TokenWithLoc>,
@@ -96,7 +122,7 @@ fn parse_numeric_literal(num_str: &str) -> Result<Expr, String> {
     }
 }
 
-fn parse_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
+fn parse_atomic_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
     let peek = p
         .peek_optional_token()
         .ok_or_else(|| "Expected expression, got end of program".to_string())?;
@@ -110,6 +136,71 @@ fn parse_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
     };
     p.advance().unwrap();
     Ok(ExprWithLoc::new(expr, peek.loc))
+}
+
+fn parse_expresstion_at_precedence(
+    p: &mut Parser,
+    precedence: usize,
+) -> Result<ExprWithLoc, String> {
+    let mut acc = parse_atomic_expression(p)?;
+    while let Some(next) = p.peek_optional_token() {
+        match next.token {
+            Token::Lparen => {
+                p.expect_token(Token::Lparen)?;
+                let right = parse_expression(p)?;
+                p.expect_token(Token::Rparen)?;
+                let loc = Loc::new(acc.loc.start, right.loc.end);
+                acc = ExprWithLoc::new(
+                    Expr::FuncCall {
+                        name: Box::new(acc),
+                        args: vec![right],
+                    },
+                    loc,
+                );
+            }
+            Token::Binop(binop) => {
+                let next_precedence = binop.precedence();
+                if next_precedence > precedence {
+                    break;
+                }
+                p.advance().unwrap();
+                let right =
+                    parse_expresstion_at_precedence(p, next_precedence)?;
+                let loc = Loc::new(acc.loc.start, right.loc.end);
+                acc = ExprWithLoc::new(
+                    Expr::Binop {
+                        op: binop,
+                        left: Box::new(acc),
+                        right: Box::new(right),
+                    },
+                    loc,
+                );
+            }
+            Token::Uniop(uniop) => {
+                let next_precedence = uniop.precedence();
+                if next_precedence > precedence {
+                    break;
+                }
+                p.advance().unwrap();
+                let right =
+                    parse_expresstion_at_precedence(p, next_precedence)?;
+                let loc = Loc::new(acc.loc.start, right.loc.end);
+                acc = ExprWithLoc::new(
+                    Expr::Uniop {
+                        op: uniop,
+                        arg: Box::new(acc),
+                    },
+                    loc,
+                );
+            }
+            _ => break,
+        }
+    }
+    Ok(acc)
+}
+
+fn parse_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
+    parse_expresstion_at_precedence(p, 14)
 }
 
 fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {

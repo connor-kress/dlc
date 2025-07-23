@@ -69,10 +69,11 @@ pub enum Token {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Uniop {
     Lnot,
-    Neg,
-    BitNeg,
+    BitNot,
     Ref,
     Deref,
+    Plus,
+    Minus,
 }
 
 #[allow(dead_code)]
@@ -94,7 +95,7 @@ pub enum Binop {
     BitOr,
     BitAnd,
     BitXor,
-    In, // for iters
+    // In, // for iters
 }
 
 #[allow(dead_code)]
@@ -236,8 +237,9 @@ static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
     LazyLock::new(|| {
         HashMap::from([
             ("!", Uniop::Lnot),
-            // ("-", Uniop::Neg), // will initially lex to binop minus
-            ("~", Uniop::BitNeg),
+            // ("+", Uniop::Plus), // will initially lex to binary ops
+            // ("-", Uniop::Minus),
+            ("~", Uniop::BitNot),
             ("&", Uniop::Ref),
             ("*", Uniop::Deref),
         ])

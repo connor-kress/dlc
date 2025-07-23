@@ -8,19 +8,12 @@ use parser::parse_program;
 #[allow(dead_code)]
 static PROGRAM: &str = r#"
 fn main(argc: int, argv: char) -> int {
-    let x;
-    x = "hello";
-    return 0;
+    5 + 6*2;
 }
 "#;
 
-#[allow(dead_code)]
-static PROGRAM_FUNCTION_HEADER: &str = r#"
-fn main(argc: int, argv: char) -> int {5; "okay"; hello;}
-"#;
-
 fn main() -> Result<(), String> {
-    let tokens = tokenize_string(PROGRAM_FUNCTION_HEADER)?;
+    let tokens = tokenize_string(PROGRAM)?;
     let raw_tokens = tokens
         .clone()
         .into_iter()

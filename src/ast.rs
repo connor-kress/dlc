@@ -95,16 +95,16 @@ pub enum Expr {
     StrLit(String),
     Uniop {
         op: Uniop,
-        arg: Box<Expr>,
+        arg: Box<ExprWithLoc>,
     },
     Binop {
         op: Binop,
-        left: Box<Expr>,
-        right: Box<Expr>,
+        left: Box<ExprWithLoc>,
+        right: Box<ExprWithLoc>,
     },
     FuncCall {
-        name: Box<Expr>,
-        args: Vec<Expr>,
+        name: Box<ExprWithLoc>,
+        args: Vec<ExprWithLoc>,
     },
 }
 
