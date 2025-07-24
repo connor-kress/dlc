@@ -67,10 +67,11 @@ pub enum Statement {
         step: Box<ExprWithLoc>,
         body: Box<StatementWithLoc>,
     },
-    Break {
+    Break,
+    Continue,
+    Return {
         val: Option<Box<ExprWithLoc>>,
     },
-    Continue,
 }
 
 #[allow(dead_code)]

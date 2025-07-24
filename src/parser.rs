@@ -142,10 +142,12 @@ fn parse_expresstion_at_precedence(
     p: &mut Parser,
     precedence: usize,
 ) -> Result<ExprWithLoc, String> {
+    // TODO: check for opening parens and reset precedence
     let mut acc = parse_atomic_expression(p)?;
     while let Some(next) = p.peek_optional_token() {
         match next.token {
             Token::Lparen => {
+                // TODO: variadic function args
                 p.expect_token(Token::Lparen)?;
                 let right = parse_expression(p)?;
                 p.expect_token(Token::Rparen)?;
@@ -204,13 +206,52 @@ fn parse_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
 }
 
 fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
-    let expr = parse_expression(p)?;
-    let expr_start = expr.loc.start;
-    let expr_end = p.expect_token(Token::Semi)?.loc.end;
-    Ok(StatementWithLoc::new(
-        Statement::Expr(expr),
-        Loc::new(expr_start, expr_end),
-    ))
+    let peek = p
+        .peek_optional_token()
+        .ok_or_else(|| "Expected statement, got end of program".to_string())?;
+    let statement = match peek.token {
+        Token::Let => {
+            todo!("let statement")
+        }
+        Token::If => {
+            todo!("if statement")
+        }
+        Token::For => {
+            todo!("for loop statement")
+        }
+        Token::While => {
+            todo!("while loop statement")
+        }
+        Token::Return => {
+            let start = p.expect_token(Token::Return)?.loc.start;
+            if p.peek_token()?.token == Token::Semi {
+                let end = p.expect_token(Token::Semi)?.loc.end;
+                StatementWithLoc::new(
+                    Statement::Return { val: None },
+                    Loc::new(start, end),
+                )
+            } else {
+                let expr = parse_expression(p)?;
+                let end = p.expect_token(Token::Semi)?.loc.end;
+                StatementWithLoc::new(
+                    Statement::Return {
+                        val: Some(Box::new(expr)),
+                    },
+                    Loc::new(start, end),
+                )
+            }
+        }
+        _ => {
+            let expr = parse_expression(p)?;
+            let expr_start = expr.loc.start;
+            let expr_end = p.expect_token(Token::Semi)?.loc.end;
+            StatementWithLoc::new(
+                Statement::Expr(expr),
+                Loc::new(expr_start, expr_end),
+            )
+        }
+    };
+    Ok(statement)
 }
 
 fn parse_type(p: &mut Parser) -> Result<TypeWithLoc, String> {

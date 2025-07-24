@@ -8,7 +8,7 @@ use parser::parse_program;
 #[allow(dead_code)]
 static PROGRAM: &str = r#"
 fn main(argc: int, argv: char) -> int {
-    5 + 6*2;
+    return 5 + 6*2;
 }
 "#;
 
