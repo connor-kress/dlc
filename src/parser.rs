@@ -211,7 +211,27 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
         .ok_or_else(|| "Expected statement, got end of program".to_string())?;
     let statement = match peek.token {
         Token::Let => {
-            todo!("let statement")
+            let start = p.expect_token(Token::Let)?.loc.start;
+            let id = p.expect_id()?;
+            let mut type_ = None;
+            if p.peek_token()?.token == Token::Colon {
+                p.advance().unwrap();
+                type_ = Some(parse_type(p)?);
+            }
+            let mut expr = None;
+            if p.peek_token()?.token == Token::Binop(Binop::Assign) {
+                p.advance().unwrap();
+                expr = Some(Box::new(parse_expression(p)?));
+            }
+            let end = p.expect_token(Token::Semi)?.loc.end;
+            StatementWithLoc::new(
+                Statement::VarDecl {
+                    name: id,
+                    type_,
+                    val: expr,
+                },
+                Loc::new(start, end),
+            )
         }
         Token::If => {
             todo!("if statement")

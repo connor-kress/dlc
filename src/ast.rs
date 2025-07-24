@@ -50,8 +50,8 @@ pub enum Statement {
     Expr(ExprWithLoc),
     Block(Vec<Statement>),
     VarDecl {
-        name: String,
-        type_: Option<Type>,
+        name: IdWithLoc,
+        type_: Option<TypeWithLoc>,
         val: Option<Box<ExprWithLoc>>,
     },
     Loop {
