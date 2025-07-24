@@ -23,7 +23,10 @@ fn main() -> Result<(), String> {
         .map(|t| t.token)
         .collect::<Vec<_>>();
     println!("{:?}", raw_tokens);
+    println!();
     let functions = parse_program(tokens)?;
-    println!("{:?}", functions[0].body);
+    for function in functions {
+        println!("{}", function);
+    }
     Ok(())
 }

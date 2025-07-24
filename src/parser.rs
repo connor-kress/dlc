@@ -6,6 +6,8 @@ use crate::{
     lexer::{Binop, Loc, PrimitiveType, Token, TokenWithLoc, Uniop},
 };
 
+static MAX_PRECEDENCE: usize = 14;
+
 #[allow(dead_code)]
 impl Binop {
     // https://en.cppreference.com/w/c/language/operator_precedence.html
@@ -90,7 +92,7 @@ impl Parser {
             format!("Expected {:?}, got end of program", token)
         })?;
         if peek.token != token {
-            return Err(format!("Expected {:?}, got {:?}", token, peek));
+            return Err(format!("Expected {:?}, got {:?}", token, peek.token));
         }
         self.get_token()
     }
@@ -127,7 +129,7 @@ fn parse_atomic_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
         .peek_optional_token()
         .ok_or_else(|| "Expected expression, got end of program".to_string())?;
     let expr = match peek.token {
-        Token::Id(id) => Expr::Id(id),
+        Token::Id(id) => Expr::Id(IdWithLoc::new(id, peek.loc.clone())),
         Token::NumLit(i) => parse_numeric_literal(&i)?,
         Token::StrLit(s) => Expr::StrLit(s),
         _ => {
@@ -202,7 +204,7 @@ fn parse_expresstion_at_precedence(
 }
 
 fn parse_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
-    parse_expresstion_at_precedence(p, 14)
+    parse_expresstion_at_precedence(p, MAX_PRECEDENCE)
 }
 
 fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
