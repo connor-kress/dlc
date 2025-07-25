@@ -26,6 +26,7 @@ impl fmt::Display for IdWithLoc {
 pub enum Type {
     Primitive(PrimitiveType),
     Id(String),
+    Ptr(Box<TypeWithLoc>),
 }
 
 impl fmt::Display for Type {
@@ -33,6 +34,7 @@ impl fmt::Display for Type {
         match self {
             Type::Primitive(ty) => write!(f, "Primative({:?})", ty),
             Type::Id(id) => write!(f, "Id({})", id),
+            Type::Ptr(ty) => write!(f, "Ptr({})", ty),
         }
     }
 }

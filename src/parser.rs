@@ -280,15 +280,26 @@ fn parse_type(p: &mut Parser) -> Result<TypeWithLoc, String> {
     let type_token = p
         .peek_optional_token()
         .ok_or_else(|| "Expected type, got end of program".to_string())?;
+    let mut end = type_token.loc.end;
+    let mut should_advance = true;
     let type_ = match type_token.token {
         Token::Type(ty) => Type::Primitive(ty),
         Token::Id(id) => Type::Id(id),
+        Token::Binop(Binop::Mul) => {
+            should_advance = false;
+            p.advance().unwrap();
+            let inner = parse_type(p)?;
+            end = inner.loc.end;
+            Type::Ptr(Box::new(inner))
+        }
         _ => {
             return Err(format!("Expected type, got {:?}", type_token.token));
         }
     };
-    p.advance().unwrap();
-    Ok(TypeWithLoc::new(type_, type_token.loc))
+    if should_advance {
+        p.advance().unwrap();
+    }
+    Ok(TypeWithLoc::new(type_, Loc::new(type_token.loc.start, end)))
 }
 
 fn parse_function(p: &mut Parser) -> Result<Function, String> {

@@ -7,10 +7,11 @@ use parser::parse_program;
 
 #[allow(dead_code)]
 static PROGRAM: &str = r#"
-fn main(argc: int, argv: char) -> int {
+fn main(argc: int, argv: **char) -> int {
     let x = 5;
     let y: int = 6;
     let z: int = x + y;
+    let p: *int = ptr_to(z);
     return 5 + 6*2;
 }
 "#;

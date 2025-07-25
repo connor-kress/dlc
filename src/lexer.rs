@@ -4,8 +4,8 @@ use std::sync::LazyLock;
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
-    line: usize,
-    col: usize,
+    pub line: usize,
+    pub col: usize,
 }
 
 #[allow(dead_code)]
@@ -308,28 +308,40 @@ fn read_string_literal(l: &mut Lexer) -> TokenWithLoc {
     TokenWithLoc::new(Token::StrLit(acc), Loc::new(start, end))
 }
 
+fn convert_operator_string(s: &str) -> Result<Token, String> {
+    let token = if s == "->" {
+        Token::ThinArrow
+    } else if let Some(token) = BINARY_OPS.get(s) {
+        Token::Binop(*token)
+    } else if let Some(token) = UNARY_OPS.get(s) {
+        Token::Uniop(*token)
+    } else {
+        return Err(format!("Invalid operator: {}", s));
+    };
+    Ok(token)
+}
+
 fn read_operator(l: &mut Lexer) -> Result<TokenWithLoc, String> {
     let (c, start) = l.get_char_with_point().unwrap();
     let mut acc = c.to_string();
     let mut end = start;
-    while l.peek_char().is_some() {
-        let c = l.peek_char().unwrap();
+    while let Some(c) = l.peek_char() {
         if OPERATOR_CHARS.contains(&c) {
+            let mut next_acc = acc.clone();
+            next_acc.push(c);
+            if convert_operator_string(&acc).is_ok()
+                && convert_operator_string(&next_acc).is_err()
+            {
+                end = l.get_last_point();
+                break;
+            }
             acc.push(l.get_char().unwrap());
         } else {
             end = l.get_last_point();
             break;
         }
     }
-    let token = if acc == "->" {
-        Token::ThinArrow
-    } else if let Some(token) = BINARY_OPS.get(acc.as_str()) {
-        Token::Binop(*token)
-    } else if let Some(token) = UNARY_OPS.get(acc.as_str()) {
-        Token::Uniop(*token)
-    } else {
-        return Err(format!("Invalid operator: {}", acc));
-    };
+    let token = convert_operator_string(&acc)?;
     Ok(TokenWithLoc::new(token, Loc::new(start, end)))
 }
 
