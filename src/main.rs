@@ -12,7 +12,7 @@ fn main(argc: int, argv: **char) -> int {
     let y: int = 6;
     let z: int = x + y;
     let p: *int = ptr_to(z);
-    return 5 + 6*2;
+    return 5 + 6*2 + foo(x, y);
 }
 "#;
 
