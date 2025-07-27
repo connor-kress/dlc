@@ -38,13 +38,14 @@ impl Binop {
         is_right_associative(self.precedence())
     }
 
-    fn as_unary(&self) -> Option<Uniop> {
+    fn as_unary_ops(&self) -> (Option<Uniop>, Option<Uniop>) {
         match self {
-            Binop::Add => Some(Uniop::Plus),
-            Binop::Sub => Some(Uniop::Minus),
-            Binop::Mul => Some(Uniop::Deref),
-            Binop::BitAnd => Some(Uniop::Ref),
-            _ => None,
+            Binop::Add => (Some(Uniop::Plus), None),
+            Binop::Sub => (Some(Uniop::Minus), None),
+            Binop::Mul => (Some(Uniop::Deref), None),
+            Binop::BitAnd => (Some(Uniop::Ref), None),
+            Binop::Land => (Some(Uniop::Ref), Some(Uniop::Ref)),
+            _ => (None, None),
         }
     }
 }
@@ -202,30 +203,58 @@ fn parse_expression_at_precedence(
     // p.debug_position();
     let peek = p.peek_token()?;
     let unary_op = if let Token::Uniop(op) = peek.token {
-        Some(op)
+        (Some(op), None)
     } else if let Token::Binop(op) = peek.token {
-        op.as_unary() // TODO: handle combined prefix unary ops like `&&`
+        op.as_unary_ops()
     } else {
-        None
+        (None, None)
     };
-    let mut acc = if let Some(op) = unary_op {
-        let start = p.get_token()?.loc.start;
-        let right = parse_expression_at_precedence(p, op.precedence())?;
-        let loc = Loc::new(start, right.loc.end);
-        ExprWithLoc::new(
-            Expr::Uniop {
-                op,
-                arg: Box::new(right),
-            },
-            loc,
-        )
-    } else if peek.token == Token::Lparen {
-        p.expect_token(Token::Lparen)?;
-        let expr = parse_expression(p)?;
-        p.expect_token(Token::Rparen)?;
-        expr
-    } else {
-        parse_atomic_expression(p)?
+    let mut acc = match unary_op {
+        (Some(op), None) => {
+            let start = p.get_token()?.loc.start;
+            let right = parse_expression_at_precedence(p, op.precedence())?;
+            let loc = Loc::new(start, right.loc.end);
+            ExprWithLoc::new(
+                Expr::Uniop {
+                    op,
+                    arg: Box::new(right),
+                },
+                loc,
+            )
+        }
+        (Some(outer_op), Some(inner_op)) => {
+            let combined_loc = p.get_token()?.loc;
+            let outer_start = combined_loc.start;
+            let inner_start = combined_loc.end;
+            let right =
+                parse_expression_at_precedence(p, inner_op.precedence())?;
+            let inner_loc = Loc::new(inner_start, right.loc.end);
+            let tmp_expr = ExprWithLoc::new(
+                Expr::Uniop {
+                    op: inner_op,
+                    arg: Box::new(right),
+                },
+                inner_loc,
+            );
+            let outer_loc = Loc::new(outer_start, tmp_expr.loc.end);
+            ExprWithLoc::new(
+                Expr::Uniop {
+                    op: outer_op,
+                    arg: Box::new(tmp_expr),
+                },
+                outer_loc,
+            )
+        }
+        _ => {
+            if peek.token == Token::Lparen {
+                p.expect_token(Token::Lparen)?;
+                let expr = parse_expression(p)?;
+                p.expect_token(Token::Rparen)?;
+                expr
+            } else {
+                parse_atomic_expression(p)?
+            }
+        }
     };
 
     while let Some(next) = p.peek_optional_token() {
