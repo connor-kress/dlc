@@ -10,7 +10,13 @@ use crate::{
 
 static MAX_PRECEDENCE: usize = 14;
 
-#[allow(dead_code)]
+fn is_right_associative(precedence: usize) -> bool {
+    match precedence {
+        2 | 13 | 14 => true, // unary, ternary, and assignment
+        _ => false,
+    }
+}
+
 impl Binop {
     // https://en.cppreference.com/w/c/language/operator_precedence.html
     fn precedence(&self) -> usize {
@@ -27,9 +33,22 @@ impl Binop {
             Binop::Assign => 14,
         }
     }
+
+    fn is_right_associative(&self) -> bool {
+        is_right_associative(self.precedence())
+    }
+
+    fn as_unary(&self) -> Option<Uniop> {
+        match self {
+            Binop::Add => Some(Uniop::Plus),
+            Binop::Sub => Some(Uniop::Minus),
+            Binop::Mul => Some(Uniop::Deref),
+            Binop::BitAnd => Some(Uniop::Ref),
+            _ => None,
+        }
+    }
 }
 
-#[allow(dead_code)]
 impl Uniop {
     fn precedence(&self) -> usize {
         2
@@ -181,13 +200,34 @@ fn parse_expression_at_precedence(
 ) -> Result<ExprWithLoc, String> {
     // println!("Parsing expression at precedence {}", precedence);
     // p.debug_position();
-    if p.peek_token()?.token == Token::Lparen {
+    let peek = p.peek_token()?;
+    let unary_op = if let Token::Uniop(op) = peek.token {
+        Some(op)
+    } else if let Token::Binop(op) = peek.token {
+        op.as_unary() // TODO: handle combined prefix unary ops like `&&`
+    } else {
+        None
+    };
+    let mut acc = if let Some(op) = unary_op {
+        let start = p.get_token()?.loc.start;
+        let right = parse_expression_at_precedence(p, op.precedence())?;
+        let loc = Loc::new(start, right.loc.end);
+        ExprWithLoc::new(
+            Expr::Uniop {
+                op,
+                arg: Box::new(right),
+            },
+            loc,
+        )
+    } else if peek.token == Token::Lparen {
         p.expect_token(Token::Lparen)?;
         let expr = parse_expression(p)?;
         p.expect_token(Token::Rparen)?;
-        return Ok(expr);
-    }
-    let mut acc = parse_atomic_expression(p)?;
+        expr
+    } else {
+        parse_atomic_expression(p)?
+    };
+
     while let Some(next) = p.peek_optional_token() {
         match next.token {
             Token::Lparen => {
@@ -201,42 +241,31 @@ fn parse_expression_at_precedence(
                     loc,
                 );
             }
-            Token::Binop(binop) => {
-                // TODO: some are right-associative
-                if binop.precedence() > precedence {
+            Token::Binop(op) => {
+                if op.precedence() > precedence {
                     break;
                 }
                 p.advance().unwrap();
-                let right =
-                    parse_expression_at_precedence(p, binop.precedence() - 1)?;
+                let next_precedence = if op.is_right_associative() {
+                    op.precedence()
+                } else {
+                    op.precedence() - 1
+                };
+                let right = parse_expression_at_precedence(p, next_precedence)?;
                 let loc = Loc::new(acc.loc.start, right.loc.end);
                 acc = ExprWithLoc::new(
                     Expr::Binop {
-                        op: binop,
+                        op,
                         left: Box::new(acc),
                         right: Box::new(right),
                     },
                     loc,
                 );
             }
-            Token::Uniop(uniop) => {
-                // TODO: some uniops tokenize as binops
-                // also this is entirely broken right now
-                if uniop.precedence() > precedence {
-                    break;
-                }
-                p.advance().unwrap();
-                let right =
-                    parse_expression_at_precedence(p, uniop.precedence())?;
-                let loc = Loc::new(acc.loc.start, right.loc.end);
-                acc = ExprWithLoc::new(
-                    Expr::Uniop {
-                        op: uniop,
-                        arg: Box::new(acc),
-                    },
-                    loc,
-                );
-            }
+            // Unary postfix ops will need to be handled before making a new
+            // call to parse_expression as we need to operate on `acc` instead
+            // of parsing a new expression
+            // Token::Uniop(op) if op.is_postfix() => ...
             _ => break,
         }
     }
