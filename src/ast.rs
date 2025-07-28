@@ -151,6 +151,11 @@ pub enum Statement {
         type_: Option<TypeWithLoc>,
         val: Option<Box<ExprWithLoc>>,
     },
+    If {
+        cond: Box<ExprWithLoc>,
+        if_block: Vec<StatementWithLoc>,
+        else_block: Option<Vec<StatementWithLoc>>,
+    },
     Loop {
         body: Box<StatementWithLoc>,
     },
@@ -193,6 +198,24 @@ impl fmt::Display for Statement {
                 } else {
                     write!(f, "VarDecl({}{})", name, type_str)
                 }
+            }
+            Statement::If {
+                cond,
+                if_block,
+                else_block,
+            } => {
+                write!(f, "If({}):", cond)?;
+                for statement in if_block {
+                    // TODO indentation
+                    write!(f, "\n        {}", statement)?;
+                }
+                if let Some(else_block) = else_block {
+                    write!(f, "\n    Else:")?;
+                    for statement in else_block {
+                        write!(f, "\n        {}", statement)?;
+                    }
+                }
+                Ok(())
             }
             Statement::Loop { body } => write!(f, "Loop {{\n{}\n}}", body),
             Statement::WhileLoop { pred, body } => {
@@ -250,7 +273,7 @@ pub struct Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({}, {})", self.name, self.param_list, self.ret_type)?;
+        write!(f, "{}({}, {}):", self.name, self.param_list, self.ret_type)?;
         for statement in &self.body {
             write!(f, "\n    {}", statement)?;
         }

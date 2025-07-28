@@ -334,7 +334,39 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
             )
         }
         Token::If => {
-            todo!("if statement")
+            let if_start = p.expect_token(Token::If)?.loc.start;
+            p.expect_token(Token::Lparen)?;
+            let cond = parse_expression(p)?;
+            p.expect_token(Token::Rparen)?;
+            p.expect_token(Token::Lcurly)?;
+            let mut if_block = Vec::new();
+            while p.peek_token()?.token != Token::Rcurly {
+                let statement = parse_statement(p)?;
+                if_block.push(statement);
+            }
+            let mut if_end = p.expect_token(Token::Rcurly)?.loc.end;
+            let else_block = if p.peek_token()?.token == Token::Else {
+                p.advance().unwrap();
+                p.expect_token(Token::Lcurly)?;
+                let mut else_block = Vec::new();
+                while p.peek_token()?.token != Token::Rcurly {
+                    let statement = parse_statement(p)?;
+                    else_block.push(statement);
+                }
+                if_end = p.expect_token(Token::Rcurly)?.loc.end;
+                Some(else_block)
+            } else {
+                None
+            };
+            let loc = Loc::new(if_start, if_end);
+            StatementWithLoc::new(
+                Statement::If {
+                    cond: Box::new(cond),
+                    if_block,
+                    else_block,
+                },
+                loc,
+            )
         }
         Token::For => {
             todo!("for loop statement")
@@ -438,12 +470,9 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
     };
     p.expect_token(Token::Lcurly)?;
     let mut body = Vec::new();
-    loop {
+    while p.peek_token()?.token != Token::Rcurly {
         let statement = parse_statement(p)?;
         body.push(statement);
-        if p.peek_token()?.token == Token::Rcurly {
-            break;
-        }
     }
     let fn_end = p.expect_token(Token::Rcurly)?.loc.end;
     Ok(Function {
