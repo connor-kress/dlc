@@ -36,7 +36,7 @@ pub enum Op {
         rhs: Arg,
     },
     Return {
-        arg: Option<Arg>,
+        arg: Arg,
     },
 }
 
@@ -53,11 +53,7 @@ impl fmt::Display for Op {
                 write!(f, "LocalAssign({}, {})", index, arg)
             }
             Op::Return { arg } => {
-                if let Some(arg) = arg {
-                    write!(f, "ret({})", arg)
-                } else {
-                    write!(f, "ret")
-                }
+                write!(f, "ret({})", arg)
             }
         }
     }

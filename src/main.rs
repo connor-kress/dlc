@@ -81,6 +81,33 @@ fn main() -> Result<(), String> {
     //     println!("{}", function);
     // }
 
+    // int64_t foo(int64_t a, int64_t b, int64_t c) {
+    //     int64_t sum = a + 2;
+    //     int64_t res = sum + c;
+    //     return res;
+    // }
+
+    let foo = IRFunction::new(
+        "foo".to_string(),
+        3, // arg_count
+        2, // local_count
+        vec![
+            Op::Binop {
+                binop: Binop::Add,
+                index: 3,
+                lhs: Arg::Local(0),
+                rhs: Arg::Literal(2),
+            },
+            Op::Binop {
+                binop: Binop::Add,
+                index: 4,
+                lhs: Arg::Local(3),
+                rhs: Arg::Local(2),
+            },
+            Op::Return { arg: Arg::Local(4) },
+        ],
+    );
+
     let main = IRFunction::new(
         "main".to_string(),
         0, // arg_count
@@ -100,12 +127,11 @@ fn main() -> Result<(), String> {
                 lhs: Arg::Local(0),
                 rhs: Arg::Local(1),
             },
-            Op::Return {
-                arg: Some(Arg::Local(2)),
-            },
+            Op::Return { arg: Arg::Local(2) },
         ],
     );
-    let program = IRProgram::new(vec![main]);
+
+    let program = IRProgram::new(vec![foo, main]);
     let basename = "output";
     let asm_filename = format!("{}.s", basename);
     let obj_filename = format!("{}.o", basename);
