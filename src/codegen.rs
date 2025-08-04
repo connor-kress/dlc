@@ -1,4 +1,39 @@
-use crate::ir::{Arg, IRFunction, IRProgram, Op};
+use crate::{
+    ir::{Arg, IRFunction, IRProgram, Op},
+    lexer::Binop,
+};
+
+#[allow(dead_code)]
+static ARG_REGISTERS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+// return register is "rax"
+
+fn load_arg<W: std::io::Write>(
+    arg: &Arg,
+    reg: &str,
+    func: &IRFunction,
+    out: &mut W,
+) {
+    match arg {
+        Arg::Local(i) => {
+            writeln!(out, "    movq {}(%rbp), %{}", func.slot_offset(*i), reg)
+                .unwrap();
+        }
+        Arg::Literal(val) => {
+            writeln!(out, "    movq ${}, %{}", val, reg).unwrap();
+        }
+        Arg::DataOffset(_) => todo!("load data offset"),
+    }
+}
+
+fn store_reg<W: std::io::Write>(
+    reg: &str,
+    index: usize,
+    func: &IRFunction,
+    out: &mut W,
+) {
+    writeln!(out, "    movq %{}, {}(%rbp)", reg, func.slot_offset(index))
+        .unwrap();
+}
 
 /// Generate an x86_64 assembly function from an IR function.
 pub fn generate_function<W: std::io::Write>(
@@ -11,24 +46,51 @@ pub fn generate_function<W: std::io::Write>(
 
     writeln!(out, "    pushq %rbp").unwrap();
     writeln!(out, "    movq %rsp, %rbp").unwrap();
-    for (_i, op) in func.body.iter().enumerate() {
+
+    if func.arg_count > ARG_REGISTERS.len() {
+        return Err(format!("Too many arguments for function {}", func.name));
+    }
+    // load args onto stack
+    for i in 0..func.arg_count {
+        writeln!(
+            out,
+            "    movq %{}, {}(%rbp)",
+            ARG_REGISTERS[i],
+            func.slot_offset(i)
+        )
+        .unwrap();
+    }
+    for (i, op) in func.body.iter().enumerate() {
         match op {
-            Op::Binop { .. } => todo!("binop op"),
-            Op::AutoAssign { .. } => todo!("autoassign op"),
+            Op::LocalAssign { index, arg } => {
+                load_arg(arg, "rax", func, out);
+                writeln!(
+                    out,
+                    "    movq %rax, {}(%rbp)",
+                    func.slot_offset(*index)
+                )
+                .unwrap();
+            }
+            Op::Binop {
+                binop,
+                index,
+                lhs,
+                rhs,
+            } => {
+                load_arg(lhs, "rdx", func, out);
+                load_arg(rhs, "rax", func, out);
+                match binop {
+                    Binop::Add => writeln!(out, "    addq %rdx, %rax").unwrap(),
+                    _ => todo!("binop op"),
+                }
+                store_reg("rax", *index, func, out);
+            }
             Op::Return { arg } => {
                 if let Some(arg) = arg {
-                    match arg {
-                        Arg::AutoVar(_) => todo!("auto var"),
-                        Arg::Literal(val) => {
-                            writeln!(out, "    movq ${}, -8(%rbp)", val)
-                                .unwrap();
-                            writeln!(out, "    movq -8(%rbp), %rax").unwrap();
-                        }
-                        Arg::DataOffset(_) => todo!("data offset"),
-                    }
+                    load_arg(arg, "rax", func, out);
                 }
-                // This is written at the end aleady?
-                // writeln!(out, "    ret").unwrap();
+                // TODO: early returns
+                assert_eq!(i, func.body.len() - 1);
             }
         }
     }

@@ -4,15 +4,18 @@ use std::fmt;
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Arg {
-    AutoVar(usize),
+    /// Local stack variable with stack offset (in bytes)
+    Local(usize),
+    /// Int literal with raw value
     Literal(u64),
+    /// Byte offset in global data section (statics and globals)
     DataOffset(usize),
 }
 
 impl fmt::Display for Arg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Arg::AutoVar(i) => write!(f, "Auto({})", i),
+            Arg::Local(i) => write!(f, "Local({})", i),
             Arg::Literal(i) => write!(f, "{}", i),
             Arg::DataOffset(i) => write!(f, "DataOffset({})", i),
         }
@@ -22,15 +25,15 @@ impl fmt::Display for Arg {
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum Op {
+    LocalAssign {
+        index: usize,
+        arg: Arg,
+    },
     Binop {
         binop: Binop,
         index: usize,
         lhs: Arg,
         rhs: Arg,
-    },
-    AutoAssign {
-        index: usize,
-        arg: Arg,
     },
     Return {
         arg: Option<Arg>,
@@ -46,8 +49,8 @@ impl fmt::Display for Op {
                 lhs,
                 rhs,
             } => write!(f, "Binop({:?}, {}, {}, {})", binop, index, lhs, rhs),
-            Op::AutoAssign { index, arg } => {
-                write!(f, "AutoAssign({}, {})", index, arg)
+            Op::LocalAssign { index, arg } => {
+                write!(f, "LocalAssign({}, {})", index, arg)
             }
             Op::Return { arg } => {
                 if let Some(arg) = arg {
@@ -60,25 +63,46 @@ impl fmt::Display for Op {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct IRFunction {
     pub name: String,
+    pub arg_count: usize,
+    pub local_count: usize,
+    pub stack_size: usize,
     pub body: Vec<Op>,
 }
 
 impl IRFunction {
-    pub fn new(name: String, body: Vec<Op>) -> Self {
-        Self { name, body }
+    pub fn new(
+        name: String,
+        arg_count: usize,
+        local_count: usize,
+        body: Vec<Op>,
+    ) -> Self {
+        let mut stack_size = (arg_count + local_count) * 8;
+        if stack_size % 16 != 0 {
+            stack_size += 8;
+        }
+        Self {
+            name,
+            arg_count,
+            local_count,
+            stack_size,
+            body,
+        }
+    }
+}
+
+impl IRFunction {
+    pub fn slot_offset(&self, slow_index: usize) -> isize {
+        -((slow_index + 1) as isize * 8)
     }
 }
 
 impl fmt::Display for IRFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "fn {}(", self.name)?;
-        for (i, arg) in self.body.iter().enumerate() {
-            writeln!(f, "    arg{}: {},", i, arg)?;
-        }
-        writeln!(f, ") {{")?;
+        writeln!(f, "{} (stack={}):", self.name, self.stack_size)?;
         for op in &self.body {
             writeln!(f, "    {}", op)?;
         }

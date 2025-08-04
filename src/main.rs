@@ -12,6 +12,7 @@ use std::process::Command;
 use crate::{
     codegen::generate_program,
     ir::{Arg, IRFunction, IRProgram, Op},
+    lexer::Binop,
 };
 
 #[allow(dead_code)]
@@ -82,9 +83,27 @@ fn main() -> Result<(), String> {
 
     let main = IRFunction::new(
         "main".to_string(),
-        vec![Op::Return {
-            arg: Some(Arg::Literal(4)),
-        }],
+        0, // arg_count
+        3, // local_count
+        vec![
+            Op::LocalAssign {
+                index: 0,
+                arg: Arg::Literal(34),
+            },
+            Op::LocalAssign {
+                index: 1,
+                arg: Arg::Literal(35),
+            },
+            Op::Binop {
+                binop: Binop::Add,
+                index: 2,
+                lhs: Arg::Local(0),
+                rhs: Arg::Local(1),
+            },
+            Op::Return {
+                arg: Some(Arg::Local(2)),
+            },
+        ],
     );
     let program = IRProgram::new(vec![main]);
     let basename = "output";
