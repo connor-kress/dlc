@@ -484,6 +484,7 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
     })
 }
 
+#[allow(dead_code)]
 pub fn parse_program(
     tokens: Vec<TokenWithLoc>,
 ) -> Result<Vec<Function>, String> {

@@ -1,7 +1,8 @@
-use crate::lexer::{Binop, Loc};
+use crate::lexer::Binop;
 use std::fmt;
 
-#[derive(Clone)]
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum Arg {
     AutoVar(usize),
     Literal(u64),
@@ -18,7 +19,8 @@ impl fmt::Display for Arg {
     }
 }
 
-#[derive(Clone)]
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum Op {
     Binop {
         binop: Binop,
@@ -58,14 +60,55 @@ impl fmt::Display for Op {
     }
 }
 
-#[derive(Clone)]
-pub struct OpWithLoc {
-    pub op: Op,
-    pub loc: Loc,
+#[derive(Clone, Debug)]
+pub struct IRFunction {
+    pub name: String,
+    pub body: Vec<Op>,
 }
 
-impl fmt::Display for OpWithLoc {
+impl IRFunction {
+    pub fn new(name: String, body: Vec<Op>) -> Self {
+        Self { name, body }
+    }
+}
+
+impl fmt::Display for IRFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.op)
+        writeln!(f, "fn {}(", self.name)?;
+        for (i, arg) in self.body.iter().enumerate() {
+            writeln!(f, "    arg{}: {},", i, arg)?;
+        }
+        writeln!(f, ") {{")?;
+        for op in &self.body {
+            writeln!(f, "    {}", op)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IRProgram {
+    pub functions: Vec<IRFunction>,
+    // pub data: Vec<u8>,
+}
+
+impl IRProgram {
+    pub fn new(functions: Vec<IRFunction>) -> Self {
+        Self {
+            functions,
+            // data: Vec::new(),
+        }
+    }
+}
+
+impl fmt::Display for IRProgram {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, func) in self.functions.iter().enumerate() {
+            if i != 0 {
+                write!(f, "\n")?;
+            }
+            writeln!(f, "{}", func)?;
+        }
+        Ok(())
     }
 }

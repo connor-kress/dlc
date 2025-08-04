@@ -365,6 +365,7 @@ fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
     Ok(Some(token))
 }
 
+#[allow(dead_code)]
 pub fn tokenize_string(s: &str) -> Result<Vec<TokenWithLoc>, String> {
     let mut l = Lexer::new(s);
     l.skip_whitespace();
