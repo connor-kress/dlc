@@ -32,7 +32,7 @@ pub enum Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Type::Primitive(ty) => write!(f, "Primative({:?})", ty),
+            Type::Primitive(ty) => write!(f, "{:?}", ty),
             Type::Id(id) => write!(f, "Id({})", id),
             Type::Ptr(ty) => write!(f, "Ptr({})", ty),
         }

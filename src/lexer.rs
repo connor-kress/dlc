@@ -25,10 +25,11 @@ impl Loc {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
-    Int,
+    Int8,
+    Int32,
+    Int64,
     Float,
     Bool,
-    Char,
     Void,
 }
 
@@ -248,10 +249,13 @@ static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
 static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, PrimitiveType>> =
     LazyLock::new(|| {
         HashMap::from([
-            ("int", PrimitiveType::Int),
+            ("int", PrimitiveType::Int32),
+            ("int8", PrimitiveType::Int8),
+            ("int32", PrimitiveType::Int32),
+            ("int64", PrimitiveType::Int64),
+            ("char", PrimitiveType::Int8),
             ("float", PrimitiveType::Float),
             ("bool", PrimitiveType::Bool),
-            ("char", PrimitiveType::Char),
             ("void", PrimitiveType::Void),
         ])
     });
