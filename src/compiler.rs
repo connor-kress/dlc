@@ -1,7 +1,6 @@
 use crate::{
-    ast::Function,
+    ast::{Expr, Function, Statement},
     ir::{Arg, IRFunction, IRProgram, Op},
-    lexer::Binop,
 };
 
 // For reference:
@@ -26,29 +25,55 @@ use crate::{
 //     ],
 // );
 
+fn compile_expr(
+    _expr: &Expr,
+    _ops: &mut Vec<Op>,
+    _stack: &mut Vec<String>,
+) -> Result<Arg, String> {
+    // TODO: handle recursively and special case for assignment
+    Ok(Arg::Literal(69))
+}
+
 fn compile_function(func: &Function) -> Result<IRFunction, String> {
+    let mut stack = Vec::new();
+    let mut ops = Vec::new();
+    for param in func.param_list.params.iter() {
+        stack.push(param.0.id.clone());
+    }
+    for stmt in func.body.iter() {
+        match &stmt.statement {
+            Statement::Expr(expr) => {
+                let _ = compile_expr(&expr.expr, &mut ops, &mut stack)?;
+            }
+            Statement::VarDecl { name, val, .. } => {
+                let index = stack.len();
+                stack.push(name.id.clone());
+                if let Some(val) = val {
+                    let arg = compile_expr(&val.expr, &mut ops, &mut stack)?;
+                    ops.push(Op::LocalAssign { index, arg });
+                }
+            }
+            Statement::Return { val } => {
+                if let Some(val) = val {
+                    let arg = compile_expr(&val.expr, &mut ops, &mut stack)?;
+                    ops.push(Op::Return { arg });
+                } else {
+                    ops.push(Op::Return {
+                        arg: Arg::Literal(0),
+                    });
+                }
+            }
+            _ => todo!(),
+        }
+    }
+    let arg_count = func.param_list.params.len();
     let ir_func = IRFunction::new(
         func.name.id.clone(),
-        0, // arg_count
-        3, // local_count
-        vec![
-            Op::LocalAssign {
-                index: 0,
-                arg: Arg::Literal(34),
-            },
-            Op::LocalAssign {
-                index: 1,
-                arg: Arg::Literal(35),
-            },
-            Op::Binop {
-                binop: Binop::Add,
-                index: 2,
-                lhs: Arg::Local(0),
-                rhs: Arg::Local(1),
-            },
-            Op::Return { arg: Arg::Local(2) },
-        ],
+        arg_count,
+        stack.len() - arg_count, // local_count
+        ops,
     );
+    println!("{}", ir_func);
     Ok(ir_func)
 }
 

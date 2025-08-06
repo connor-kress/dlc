@@ -88,9 +88,7 @@ impl IRFunction {
             body,
         }
     }
-}
 
-impl IRFunction {
     pub fn slot_offset(&self, slow_index: usize) -> isize {
         -((slow_index + 1) as isize * 8)
     }
@@ -98,11 +96,15 @@ impl IRFunction {
 
 impl fmt::Display for IRFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "{} (stack={}):", self.name, self.stack_size)?;
+        writeln!(
+            f,
+            "{}(args={}, locals={}, stack_size={}):",
+            self.name, self.arg_count, self.local_count, self.stack_size,
+        )?;
         for op in &self.body {
             writeln!(f, "    {}", op)?;
         }
-        writeln!(f, "}}")
+        Ok(())
     }
 }
 

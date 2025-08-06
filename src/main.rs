@@ -71,12 +71,14 @@ fn assemble_and_link_program(
 
 fn main() -> Result<(), String> {
     let tokens = tokenize_string(PROGRAM)?;
+    println!("Parsing program...");
     let functions = parse_program(tokens)?;
     for function in functions.iter() {
         println!("{}", function);
         println!();
     }
 
+    println!("Compiling program...");
     let program = compile_program(&functions)?;
 
     let basename = "output";
