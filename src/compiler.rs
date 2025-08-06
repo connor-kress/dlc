@@ -25,40 +25,55 @@ use crate::{
 //     ],
 // );
 
-fn compile_expr(
-    _expr: &Expr,
-    _ops: &mut Vec<Op>,
-    _stack: &mut Vec<String>,
-) -> Result<Arg, String> {
+struct FnContext {
+    pub stack: Vec<String>,
+    pub ops: Vec<Op>,
+}
+
+impl FnContext {
+    fn new() -> Self {
+        Self {
+            stack: Vec::new(),
+            ops: Vec::new(),
+        }
+    }
+
+    fn add_local(&mut self, name: String) -> usize {
+        self.stack.push(name);
+        self.stack.len() - 1
+    }
+}
+
+fn compile_expr(_expr: &Expr, _ctx: &mut FnContext) -> Result<Arg, String> {
     // TODO: handle recursively and special case for assignment
+    // Should the stack have optional strings for unamed temp values?
+    // Should there be a separate IRBinop/Uniop type?
     Ok(Arg::Literal(69))
 }
 
 fn compile_function(func: &Function) -> Result<IRFunction, String> {
-    let mut stack = Vec::new();
-    let mut ops = Vec::new();
+    let mut ctx = FnContext::new();
     for param in func.param_list.params.iter() {
-        stack.push(param.0.id.clone());
+        ctx.add_local(param.0.id.clone());
     }
     for stmt in func.body.iter() {
         match &stmt.statement {
             Statement::Expr(expr) => {
-                let _ = compile_expr(&expr.expr, &mut ops, &mut stack)?;
+                let _ = compile_expr(&expr.expr, &mut ctx)?;
             }
             Statement::VarDecl { name, val, .. } => {
-                let index = stack.len();
-                stack.push(name.id.clone());
+                let index = ctx.add_local(name.id.clone());
                 if let Some(val) = val {
-                    let arg = compile_expr(&val.expr, &mut ops, &mut stack)?;
-                    ops.push(Op::LocalAssign { index, arg });
+                    let arg = compile_expr(&val.expr, &mut ctx)?;
+                    ctx.ops.push(Op::LocalAssign { index, arg });
                 }
             }
             Statement::Return { val } => {
                 if let Some(val) = val {
-                    let arg = compile_expr(&val.expr, &mut ops, &mut stack)?;
-                    ops.push(Op::Return { arg });
+                    let arg = compile_expr(&val.expr, &mut ctx)?;
+                    ctx.ops.push(Op::Return { arg });
                 } else {
-                    ops.push(Op::Return {
+                    ctx.ops.push(Op::Return {
                         arg: Arg::Literal(0),
                     });
                 }
@@ -70,8 +85,8 @@ fn compile_function(func: &Function) -> Result<IRFunction, String> {
     let ir_func = IRFunction::new(
         func.name.id.clone(),
         arg_count,
-        stack.len() - arg_count, // local_count
-        ops,
+        ctx.stack.len() - arg_count, // local_count
+        ctx.ops,
     );
     println!("{}", ir_func);
     Ok(ir_func)
