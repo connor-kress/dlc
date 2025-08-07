@@ -27,7 +27,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 struct FnContext {
-    pub stack: Vec<String>,
+    pub stack: Vec<Option<String>>,
     pub ops: Vec<Op>,
 }
 
@@ -40,12 +40,31 @@ impl FnContext {
     }
 
     fn add_local(&mut self, name: String) -> usize {
-        self.stack.push(name);
+        self.stack.push(Some(name));
         self.stack.len() - 1
     }
 
+    fn add_tmp_local(&mut self) -> usize {
+        self.stack.push(None);
+        self.stack.len() - 1
+    }
+
+    fn is_tmp_local(&self, index: usize) -> bool {
+        self.stack[index].is_none()
+    }
+
+    fn reassign_local(&mut self, index: usize, name: String) {
+        self.stack[index] = Some(name);
+    }
+
     fn get_local(&self, name: &str) -> Option<usize> {
-        self.stack.iter().position(|s| s == name)
+        self.stack.iter().position(|s| {
+            if let Some(s) = s {
+                s == name
+            } else {
+                false
+            }
+        })
     }
 }
 
@@ -67,7 +86,7 @@ fn compile_expr(
         Expr::Binop { op, left, right } => {
             let lhs = compile_expr(&left, ctx)?;
             let rhs = compile_expr(&right, ctx)?;
-            let index = ctx.add_local(format!("_tmp{}_", ctx.stack.len()));
+            let index = ctx.add_tmp_local();
             ctx.ops.push(Op::Binop {
                 binop: op.clone(),
                 index,
@@ -95,9 +114,17 @@ fn compile_stmt(
         Statement::VarDecl { name, val, .. } => {
             if let Some(val) = val {
                 let arg = compile_expr(val, ctx)?;
-                // if arg is a tmp local, then we don't need to re-assign it
-                let index = ctx.add_local(name.id.clone());
-                ctx.ops.push(Op::LocalAssign { index, arg });
+                let mut assigned_tmp = false;
+                if let Arg::Local(index) = &arg {
+                    if ctx.is_tmp_local(*index) {
+                        ctx.reassign_local(*index, name.id.clone());
+                        assigned_tmp = true;
+                    }
+                }
+                if !assigned_tmp {
+                    let index = ctx.add_local(name.id.clone());
+                    ctx.ops.push(Op::LocalAssign { index, arg });
+                }
             }
         }
         Statement::Return { val } => {
