@@ -10,7 +10,7 @@ use compiler::compile_program;
 use lexer::tokenize_string;
 use parser::parse_program;
 use std::fs::File;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[allow(dead_code)]
 static PROGRAM: &str = r#"
@@ -68,7 +68,40 @@ fn assemble_and_link_program(
     Ok(())
 }
 
+fn run_executable(exe_filename: &str) -> Result<(), String> {
+    let exe_path = if exe_filename.contains('/') {
+        exe_filename.to_string()
+    } else {
+        format!("./{}", exe_filename)
+    };
+
+    println!("Running: `{}`", exe_path);
+
+    let status = Command::new(exe_path)
+        .stdout(Stdio::inherit()) // Pass stdout directly to terminal
+        .stderr(Stdio::inherit()) // Pass stderr directly to terminal
+        .status()
+        .map_err(|e| format!("Failed to execute '{}': {}", exe_filename, e))?;
+
+    println!();
+    match status.code() {
+        Some(0) => {
+            println!("Program exited normally with code 0.");
+        }
+        Some(code) => {
+            println!("Program exited with error code {}.", code);
+        }
+        None => {
+            println!("Program terminated by signal.");
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), String> {
+    let args = std::env::args().collect::<Vec<_>>();
+    let should_run =
+        args.len() >= 2 && matches!(args[1].as_str(), "-r" | "--run");
     let tokens = tokenize_string(PROGRAM)?;
     println!("Parsing program...");
     let functions = parse_program(tokens)?;
@@ -87,6 +120,12 @@ fn main() -> Result<(), String> {
     let mut file = File::create(&asm_filename)
         .map_err(|e| format!("Failed to create file: {}", e))?;
     generate_program(&program, &mut file)?;
+
     assemble_and_link_program(&asm_filename, &obj_filename, &exe_filename)?;
+
+    if should_run {
+        println!();
+        run_executable(&exe_filename)?;
+    }
     Ok(())
 }
