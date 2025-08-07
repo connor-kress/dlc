@@ -73,10 +73,27 @@ pub fn generate_function<W: std::io::Write>(
                 lhs,
                 rhs,
             } => {
-                load_arg(lhs, "rdx", func, out);
-                load_arg(rhs, "rax", func, out);
+                load_arg(lhs, "rax", func, out);
                 match binop {
-                    Binop::Add => writeln!(out, "    addq %rdx, %rax").unwrap(),
+                    Binop::Add => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    addq %rdx, %rax").unwrap();
+                    }
+                    Binop::Sub => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    subq %rdx, %rax").unwrap();
+                    }
+                    Binop::Mul => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    imulq %rdx, %rax").unwrap()
+                    }
+                    Binop::Div => {
+                        load_arg(rhs, "rcx", func, out);
+                        // sign-extend rax into rdx:rax
+                        writeln!(out, "    cqto").unwrap();
+                        // rax = quotient, rdx = remainder
+                        writeln!(out, "    idivq %rcx").unwrap();
+                    }
                     _ => todo!("binop op"),
                 }
                 store_reg("rax", *index, func, out);

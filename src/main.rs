@@ -21,10 +21,9 @@ fn foo(a: int64, b: int64, c: int64) -> int64 {
 }
 
 fn main(argc: int64, argv: **char) -> int64 {
-    let x = 34;
-    let y = 35;
-    let z = x + y;
-    return z;
+    let x = 100;
+    let y = x - 10*3;
+    return (y / 3) * 3;
 }
 "#;
 
