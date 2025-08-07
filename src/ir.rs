@@ -7,7 +7,7 @@ pub enum Arg {
     /// Local stack variable with stack offset (in bytes)
     Local(usize),
     /// Int literal with raw value
-    Literal(u64),
+    Literal(i64),
     /// Byte offset in global data section (statics and globals)
     DataOffset(usize),
 }
