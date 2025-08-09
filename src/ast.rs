@@ -2,6 +2,8 @@ use std::fmt;
 
 use crate::lexer::{Binop, Loc, PrimitiveType, Uniop};
 
+static INDENT_WIDTH: usize = 4;
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct IdWithLoc {
@@ -80,14 +82,20 @@ pub enum Expr {
     },
 }
 
-impl fmt::Display for Expr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Expr {
+    pub fn fmt_with_indent(
+        &self,
+        f: &mut fmt::Formatter,
+        _indent: usize,
+    ) -> fmt::Result {
         match self {
             Expr::Id(id) => write!(f, "{}", id),
             Expr::IntLit(n) => write!(f, "{}", n),
             Expr::FloatLit(n) => write!(f, "{}", n),
             Expr::StrLit(s) => write!(f, "\"{}\"", s),
-            Expr::Uniop { op, arg } => write!(f, "{:?}({})", op, arg),
+            Expr::Uniop { op, arg } => {
+                write!(f, "{:?}({})", op, arg)
+            }
             Expr::Binop { op, left, right } => {
                 write!(f, "{:?}({}, {})", op, left, right)
             }
@@ -99,6 +107,12 @@ impl fmt::Display for Expr {
                 write!(f, ")")
             }
         }
+    }
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_with_indent(f, 0)
     }
 }
 
@@ -115,9 +129,19 @@ impl ExprWithLoc {
     }
 }
 
+impl ExprWithLoc {
+    pub fn fmt_with_indent(
+        &self,
+        f: &mut fmt::Formatter,
+        indent: usize,
+    ) -> fmt::Result {
+        self.expr.fmt_with_indent(f, indent)
+    }
+}
+
 impl fmt::Display for ExprWithLoc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.expr)
+        self.fmt_with_indent(f, 0)
     }
 }
 
@@ -157,17 +181,17 @@ pub enum Statement {
         else_block: Option<Vec<StatementWithLoc>>,
     },
     Loop {
-        body: Box<StatementWithLoc>,
+        body: Vec<StatementWithLoc>,
     },
     WhileLoop {
         pred: Box<ExprWithLoc>,
-        body: Box<StatementWithLoc>,
+        body: Vec<StatementWithLoc>,
     },
     ForLoop {
         start: Box<ExprWithLoc>,
         pred: Box<ExprWithLoc>,
         step: Box<ExprWithLoc>,
-        body: Box<StatementWithLoc>,
+        body: Vec<StatementWithLoc>,
     },
     Break,
     Continue,
@@ -176,50 +200,66 @@ pub enum Statement {
     },
 }
 
-impl fmt::Display for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Statement {
+    pub fn fmt_with_indent(
+        &self,
+        f: &mut fmt::Formatter,
+        indent: usize,
+    ) -> fmt::Result {
+        let indent_str = " ".repeat(indent * INDENT_WIDTH);
         match self {
-            Statement::Expr(expr) => write!(f, "{}", expr),
-            // TODO indentation for all loops/blocks
+            Statement::Expr(expr) => {
+                write!(f, "{}", indent_str)?;
+                expr.fmt_with_indent(f, indent)?;
+            }
             Statement::Block(statements) => {
-                write!(f, "Block {{\n")?;
+                write!(f, "{}Block:", indent_str)?;
                 for statement in statements {
-                    write!(f, "    {}", statement)?;
+                    write!(f, "\n")?;
+                    statement.fmt_with_indent(f, indent + 1)?;
                 }
-                write!(f, "\n}}")
             }
             Statement::VarDecl { name, type_, val } => {
-                let type_str = match type_ {
-                    Some(type_) => format!(": {}", type_),
-                    None => "".to_string(),
-                };
-                if let Some(val) = val {
-                    write!(f, "VarDecl({}{}, {})", name, type_str, val)
-                } else {
-                    write!(f, "VarDecl({}{})", name, type_str)
+                write!(f, "{}VarDecl({}", indent_str, name)?;
+                if let Some(type_) = type_ {
+                    write!(f, ": {}", type_)?;
                 }
+                if let Some(val) = val {
+                    write!(f, ", {}", val)?;
+                }
+                write!(f, ")")?;
             }
             Statement::If {
                 cond,
                 if_block,
                 else_block,
             } => {
-                write!(f, "If({}):", cond)?;
+                write!(f, "{}If({}):", indent_str, cond)?;
                 for statement in if_block {
-                    // TODO indentation
-                    write!(f, "\n        {}", statement)?;
+                    write!(f, "\n")?;
+                    statement.fmt_with_indent(f, indent + 1)?;
                 }
                 if let Some(else_block) = else_block {
-                    write!(f, "\n    Else:")?;
+                    write!(f, "\n{}Else:", indent_str)?;
                     for statement in else_block {
-                        write!(f, "\n        {}", statement)?;
+                        write!(f, "\n")?;
+                        statement.fmt_with_indent(f, indent + 1)?;
                     }
                 }
-                Ok(())
             }
-            Statement::Loop { body } => write!(f, "Loop {{\n{}\n}}", body),
+            Statement::Loop { body } => {
+                write!(f, "{}Loop:", indent_str)?;
+                for statement in body {
+                    write!(f, "\n")?;
+                    statement.fmt_with_indent(f, indent + 1)?;
+                }
+            }
             Statement::WhileLoop { pred, body } => {
-                write!(f, "While({}) {{\n{}\n}}", pred, body)
+                write!(f, "{}While({}):", indent_str, pred)?;
+                for statement in body {
+                    write!(f, "\n")?;
+                    statement.fmt_with_indent(f, indent + 1)?;
+                }
             }
             Statement::ForLoop {
                 start,
@@ -227,18 +267,30 @@ impl fmt::Display for Statement {
                 step,
                 body,
             } => {
-                write!(f, "For({}, {}, {}) {{\n{}\n}}", start, pred, step, body)
+                write!(f, "{}For({}, {}, {}):", indent_str, start, pred, step)?;
+                for statement in body {
+                    write!(f, "\n")?;
+                    statement.fmt_with_indent(f, indent + 1)?;
+                }
             }
-            Statement::Break => write!(f, "Break"),
-            Statement::Continue => write!(f, "Continue"),
+            Statement::Break => write!(f, "{}Break", indent_str)?,
+            Statement::Continue => write!(f, "{}Continue", indent_str)?,
             Statement::Return { val } => {
+                write!(f, "{}Return(", indent_str)?;
                 if let Some(val) = val {
-                    write!(f, "Return({})", val)
+                    write!(f, "{})", val)?;
                 } else {
-                    write!(f, "Return(Void)")
+                    write!(f, "Void)")?;
                 }
             }
         }
+        Ok(())
+    }
+}
+
+impl fmt::Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_with_indent(f, 0)
     }
 }
 
@@ -255,9 +307,19 @@ impl StatementWithLoc {
     }
 }
 
+impl StatementWithLoc {
+    pub fn fmt_with_indent(
+        &self,
+        f: &mut fmt::Formatter,
+        indent: usize,
+    ) -> fmt::Result {
+        self.statement.fmt_with_indent(f, indent)
+    }
+}
+
 impl fmt::Display for StatementWithLoc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.statement)
+        self.fmt_with_indent(f, 0)
     }
 }
 
@@ -271,12 +333,29 @@ pub struct Function {
     pub loc: Loc,
 }
 
-impl fmt::Display for Function {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}({}, {}):", self.name, self.param_list, self.ret_type)?;
+impl Function {
+    pub fn fmt_with_indent(
+        &self,
+        f: &mut fmt::Formatter,
+        indent: usize,
+    ) -> fmt::Result {
+        let indent_str = " ".repeat(indent * INDENT_WIDTH);
+        write!(f, "{}", indent_str)?;
+        write!(
+            f,
+            "{}({}, {}):\n",
+            self.name, self.param_list, self.ret_type
+        )?;
         for statement in &self.body {
-            write!(f, "\n    {}", statement)?;
+            statement.fmt_with_indent(f, indent + 1)?;
+            write!(f, "\n")?;
         }
         Ok(())
+    }
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_with_indent(f, 0)
     }
 }

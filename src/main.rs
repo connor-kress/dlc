@@ -13,6 +13,26 @@ use std::fs::File;
 use std::process::{Command, Stdio};
 
 #[allow(dead_code)]
+static PARSING_TEST_PROGRAM: &str = r#"
+fn foo(a: int64, b: int64, c: int64) -> int64 {
+    let sum = a + 2;
+    let res = sum + c;
+    if (res) {
+        res = res + 2*sum;
+        res = res + 2*sum;
+        if (res < 10) {
+            print("Small");
+        } else {
+            print("Big");
+        }
+    } else {
+        return 0;
+    }
+    return res;
+}
+"#;
+
+#[allow(dead_code)]
 static PROGRAM: &str = r#"
 fn foo(a: int64, b: int64, c: int64) -> int64 {
     let sum = a + 2;
@@ -78,8 +98,8 @@ fn run_executable(exe_filename: &str) -> Result<(), String> {
     println!("Running: `{}`", exe_path);
 
     let status = Command::new(exe_path)
-        .stdout(Stdio::inherit()) // Pass stdout directly to terminal
-        .stderr(Stdio::inherit()) // Pass stderr directly to terminal
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .status()
         .map_err(|e| format!("Failed to execute '{}': {}", exe_filename, e))?;
 
@@ -99,6 +119,14 @@ fn run_executable(exe_filename: &str) -> Result<(), String> {
 }
 
 fn main() -> Result<(), String> {
+    let tokens = tokenize_string(PARSING_TEST_PROGRAM)?;
+    println!("Parsing test...");
+    let parsing_test_functions = parse_program(tokens)?;
+    for function in parsing_test_functions.iter() {
+        println!("{}", function);
+        println!();
+    }
+
     let args = std::env::args().collect::<Vec<_>>();
     let should_run =
         args.len() >= 2 && matches!(args[1].as_str(), "-r" | "--run");
