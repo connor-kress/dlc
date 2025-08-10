@@ -4,7 +4,5 @@
 # Personal notes
 notes.md
 
-# Output files
-output
-output.o
-output.s
+# Examples (not in the repo for now)
+examples/

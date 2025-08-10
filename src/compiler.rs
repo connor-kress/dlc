@@ -3,28 +3,6 @@ use crate::{
     ir::{Arg, IRFunction, IRProgram, Op},
 };
 
-// For reference:
-// let foo = IRFunction::new(
-//     "foo".to_string(),
-//     3, // arg_count
-//     2, // local_count
-//     vec![
-//         Op::Binop {
-//             binop: Binop::Add,
-//             index: 3,
-//             lhs: Arg::Local(0),
-//             rhs: Arg::Literal(2),
-//         },
-//         Op::Binop {
-//             binop: Binop::Add,
-//             index: 4,
-//             lhs: Arg::Local(3),
-//             rhs: Arg::Local(2),
-//         },
-//         Op::Return { arg: Arg::Local(4) },
-//     ],
-// );
-
 #[derive(Clone, Debug)]
 struct FnContext {
     pub stack: Vec<Option<String>>,
@@ -199,4 +177,36 @@ pub fn compile_program(funcs: &Vec<Function>) -> Result<IRProgram, String> {
     }
     let program = IRProgram::new(ir_funcs);
     Ok(program)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::tokenize_string;
+    use crate::parser::parse_program;
+
+    static PROGRAM: &str = r#"
+fn foo(a: int64, b: int64, c: int64) -> int64 {
+    let res = a + 2;
+    res += c;
+    return res;
+}
+
+fn main(argc: int64, argv: **char) -> int64 {
+    let x = 100;
+    x -= 10*3;
+    x /= 3;
+    x *= 3;
+    return x;
+}
+"#;
+
+    #[test]
+    fn test_compile_program() {
+        let tokens = tokenize_string(PROGRAM).expect("tokenize");
+        let functions = parse_program(tokens).expect("parse");
+        let ir = compile_program(&functions).expect("compile");
+        assert!(!ir.functions.is_empty());
+        // TODO: assert exact IR output
+    }
 }

@@ -500,3 +500,36 @@ pub fn parse_program(
     }
     Ok(functions)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lexer::tokenize_string;
+
+    static PARSING_TEST_PROGRAM: &str = r#"
+fn foo(a: int64, b: int64, c: int64) -> int64 {
+    let sum = a + 2;
+    let res = sum + c;
+    if (res) {
+        res = res + 2*sum;
+        res = res + 2*sum;
+        if (res < 10) {
+            print("Small");
+        } else {
+            print("Big");
+        }
+    } else {
+        return 0;
+    }
+    return res;
+}
+"#;
+
+    #[test]
+    fn test_parse_program() {
+        let tokens = tokenize_string(PARSING_TEST_PROGRAM).expect("tokenize");
+        let functions = parse_program(tokens).expect("parse");
+        assert!(!functions.is_empty());
+        // TODO: assert exact AST output
+    }
+}

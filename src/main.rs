@@ -10,51 +10,19 @@ use compiler::compile_program;
 use lexer::tokenize_string;
 use parser::parse_program;
 use std::fs::File;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-#[allow(dead_code)]
-static PARSING_TEST_PROGRAM: &str = r#"
-fn foo(a: int64, b: int64, c: int64) -> int64 {
-    let sum = a + 2;
-    let res = sum + c;
-    if (res) {
-        res = res + 2*sum;
-        res = res + 2*sum;
-        if (res < 10) {
-            print("Small");
-        } else {
-            print("Big");
-        }
-    } else {
-        return 0;
-    }
-    return res;
-}
-"#;
-
-#[allow(dead_code)]
-static PROGRAM: &str = r#"
-fn foo(a: int64, b: int64, c: int64) -> int64 {
-    let res = a + 2;
-    res += c;
-    return res;
-}
-
-fn main(argc: int64, argv: **char) -> int64 {
-    let x = 100;
-    x -= 10*3;
-    x /= 3;
-    x *= 3;
-    return x;
-}
-"#;
-
 fn assemble_and_link_program(
-    asm_filename: &str,
-    obj_filename: &str,
-    exe_filename: &str,
+    asm_filename: &Path,
+    obj_filename: &Path,
+    exe_filename: &Path,
 ) -> Result<(), String> {
-    println!("Assembling {} to {}...", asm_filename, obj_filename);
+    println!(
+        "Assembling `{}` to `{}`...",
+        asm_filename.display(),
+        obj_filename.display()
+    );
     let assemble_output = Command::new("as")
         .arg(asm_filename)
         .arg("-o")
@@ -71,7 +39,11 @@ fn assemble_and_link_program(
     }
     println!("Assembled successfully.");
 
-    println!("Linking {} to {}...", obj_filename, exe_filename);
+    println!(
+        "Linking `{}` to `{}`...",
+        obj_filename.display(),
+        exe_filename.display()
+    );
     let link_output = Command::new("cc")
         .arg(obj_filename)
         .arg("-o")
@@ -90,20 +62,22 @@ fn assemble_and_link_program(
     Ok(())
 }
 
-fn run_executable(exe_filename: &str) -> Result<(), String> {
-    let exe_path = if exe_filename.contains('/') {
-        exe_filename.to_string()
+fn run_executable(exe_path: &Path) -> Result<(), String> {
+    let run_target: PathBuf = if exe_path.components().count() == 1 {
+        PathBuf::from(format!("./{}", exe_path.to_string_lossy()))
     } else {
-        format!("./{}", exe_filename)
+        exe_path.to_path_buf()
     };
 
-    println!("Running: `{}`", exe_path);
+    println!("Running: `{}`", run_target.display());
 
-    let status = Command::new(exe_path)
+    let status = Command::new(&run_target)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
-        .map_err(|e| format!("Failed to execute '{}': {}", exe_filename, e))?;
+        .map_err(|e| {
+            format!("Failed to execute '{}': {}", run_target.display(), e)
+        })?;
 
     println!();
     match status.code() {
@@ -120,19 +94,85 @@ fn run_executable(exe_filename: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn main() -> Result<(), String> {
-    // let tokens = tokenize_string(PARSING_TEST_PROGRAM)?;
-    // println!("Parsing test...");
-    // let parsing_test_functions = parse_program(tokens)?;
-    // for function in parsing_test_functions.iter() {
-    //     println!("{}", function);
-    //     println!();
-    // }
+struct CliOptions {
+    should_run: bool,
+    output_path: PathBuf,
+    input_files: Vec<PathBuf>,
+}
 
+fn parse_cli_args() -> Result<CliOptions, String> {
     let args = std::env::args().collect::<Vec<_>>();
-    let should_run =
-        args.len() >= 2 && matches!(args[1].as_str(), "-r" | "--run");
-    let tokens = tokenize_string(PROGRAM)?;
+
+    let mut should_run = false;
+    let mut output_path_opt = None;
+    let mut input_files = Vec::<PathBuf>::new();
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-r" | "--run" => {
+                should_run = true;
+                i += 1;
+            }
+            "-o" | "--output" => {
+                if i + 1 >= args.len() {
+                    return Err("Expected output name after -o".to_string());
+                }
+                output_path_opt = Some(PathBuf::from(args[i + 1].clone()));
+                i += 2;
+            }
+            s if s.starts_with('-') => {
+                return Err(format!("Unknown flag: {}", s));
+            }
+            _ => {
+                input_files.push(PathBuf::from(&args[i]));
+                i += 1;
+            }
+        }
+    }
+
+    if input_files.is_empty() {
+        return Err(
+            "No input file provided. Please specify a file to compile."
+                .to_string(),
+        );
+    }
+    if input_files.len() != 1 {
+        return Err(format!(
+            "Expected exactly 1 input file for now, got {}",
+            input_files.len()
+        ));
+    }
+
+    let input_path = &input_files[0];
+    let output_path = if let Some(path) = output_path_opt {
+        path
+    } else {
+        // Default to the input file's stem in the current directory
+        let stem = input_path
+            .file_stem()
+            .unwrap_or_else(|| input_path.as_os_str())
+            .to_os_string();
+        PathBuf::from(stem)
+    };
+
+    Ok(CliOptions {
+        should_run,
+        output_path,
+        input_files,
+    })
+}
+
+fn main() -> Result<(), String> {
+    let cli = parse_cli_args()?;
+
+    let input_path = &cli.input_files[0];
+    let program_source = {
+        std::fs::read_to_string(input_path).map_err(|e| {
+            format!("Failed to read file '{}': {}", input_path.display(), e)
+        })?
+    };
+    let tokens = tokenize_string(&program_source)?;
     println!("Parsing program...");
     let functions = parse_program(tokens)?;
     for function in functions.iter() {
@@ -143,19 +183,23 @@ fn main() -> Result<(), String> {
     println!("Compiling program...");
     let program = compile_program(&functions)?;
 
-    let basename = "output";
-    let asm_filename = format!("{}.s", basename);
-    let obj_filename = format!("{}.o", basename);
-    let exe_filename = format!("{}", basename);
+    let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
+    let input_basename = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| input_path.to_string_lossy().to_string());
+    let asm_filename = parent_dir.join(format!("{}.s", input_basename));
+    let obj_filename = parent_dir.join(format!("{}.o", input_basename));
     let mut file = File::create(&asm_filename)
         .map_err(|e| format!("Failed to create file: {}", e))?;
     generate_program(&program, &mut file)?;
 
-    assemble_and_link_program(&asm_filename, &obj_filename, &exe_filename)?;
+    assemble_and_link_program(&asm_filename, &obj_filename, &cli.output_path)?;
 
-    if should_run {
+    if cli.should_run {
         println!();
-        run_executable(&exe_filename)?;
+        run_executable(&cli.output_path)?;
     }
     Ok(())
 }
