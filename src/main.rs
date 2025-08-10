@@ -43,7 +43,8 @@ fn foo(a: int64, b: int64, c: int64) -> int64 {
 fn main(argc: int64, argv: **char) -> int64 {
     let x = 100;
     let y = x - 10*3;
-    return (y / 3) * 3;
+    y = y - 1;
+    return y;
 }
 "#;
 
@@ -119,13 +120,13 @@ fn run_executable(exe_filename: &str) -> Result<(), String> {
 }
 
 fn main() -> Result<(), String> {
-    let tokens = tokenize_string(PARSING_TEST_PROGRAM)?;
-    println!("Parsing test...");
-    let parsing_test_functions = parse_program(tokens)?;
-    for function in parsing_test_functions.iter() {
-        println!("{}", function);
-        println!();
-    }
+    // let tokens = tokenize_string(PARSING_TEST_PROGRAM)?;
+    // println!("Parsing test...");
+    // let parsing_test_functions = parse_program(tokens)?;
+    // for function in parsing_test_functions.iter() {
+    //     println!("{}", function);
+    //     println!();
+    // }
 
     let args = std::env::args().collect::<Vec<_>>();
     let should_run =

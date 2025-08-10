@@ -82,7 +82,23 @@ fn compile_expr(
             Arg::Local(index)
         }
         Expr::IntLit(val) => Arg::Literal((*val).into()),
-        // TODO: special case for assignment binops
+        Expr::Binop { op, left, right } if op.is_assignment() => {
+            // TODO: +=, -=, etc.
+            match &left.expr {
+                Expr::Id(id) => {
+                    let index = ctx.get_local(&id.id).ok_or_else(|| {
+                        format!("Undefined local variable \"{}\"", id.id)
+                    })?;
+                    let rhs = compile_expr(&right, ctx)?;
+                    ctx.ops.push(Op::LocalAssign {
+                        index,
+                        arg: rhs.clone(),
+                    });
+                    rhs
+                }
+                _ => todo!("Invalid left-hand side of assignment"),
+            }
+        }
         Expr::Binop { op, left, right } => {
             let lhs = compile_expr(&left, ctx)?;
             let rhs = compile_expr(&right, ctx)?;

@@ -99,6 +99,12 @@ pub enum Binop {
     // In, // for iters
 }
 
+impl Binop {
+    pub fn is_assignment(&self) -> bool {
+        matches!(self, Binop::Assign)
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TokenWithLoc {
