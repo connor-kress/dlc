@@ -35,16 +35,17 @@ fn foo(a: int64, b: int64, c: int64) -> int64 {
 #[allow(dead_code)]
 static PROGRAM: &str = r#"
 fn foo(a: int64, b: int64, c: int64) -> int64 {
-    let sum = a + 2;
-    let res = sum + c;
+    let res = a + 2;
+    res += c;
     return res;
 }
 
 fn main(argc: int64, argv: **char) -> int64 {
     let x = 100;
-    let y = x - 10*3;
-    y = y - 1;
-    return y;
+    x -= 10*3;
+    x /= 3;
+    x *= 3;
+    return x;
 }
 "#;
 

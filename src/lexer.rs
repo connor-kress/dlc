@@ -81,6 +81,10 @@ pub enum Uniop {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Binop {
     Assign,
+    AssignAdd,
+    AssignSub,
+    AssignMul,
+    AssignDiv,
     Eq,
     Neq,
     Lt,
@@ -101,7 +105,27 @@ pub enum Binop {
 
 impl Binop {
     pub fn is_assignment(&self) -> bool {
-        matches!(self, Binop::Assign)
+        matches!(
+            self,
+            Binop::Assign
+                | Binop::AssignAdd
+                | Binop::AssignSub
+                | Binop::AssignMul
+                | Binop::AssignDiv
+        )
+    }
+
+    pub fn assign_op(&self) -> Result<Option<Binop>, String> {
+        Ok(match self {
+            Binop::Assign => None,
+            Binop::AssignAdd => Some(Binop::Add),
+            Binop::AssignSub => Some(Binop::Sub),
+            Binop::AssignMul => Some(Binop::Mul),
+            Binop::AssignDiv => Some(Binop::Div),
+            _ => {
+                return Err(format!("Invalid assignment operator: {:?}", self));
+            }
+        })
     }
 }
 
@@ -231,6 +255,10 @@ static BINARY_OPS: LazyLock<HashMap<&'static str, Binop>> =
             ("&", Binop::BitAnd),
             ("^", Binop::BitXor),
             ("=", Binop::Assign),
+            ("+=", Binop::AssignAdd),
+            ("-=", Binop::AssignSub),
+            ("*=", Binop::AssignMul),
+            ("/=", Binop::AssignDiv),
             ("<", Binop::Lt),
             ("<=", Binop::Le),
             (">", Binop::Gt),

@@ -30,7 +30,11 @@ impl Binop {
             Binop::BitOr => 10,
             Binop::Land => 11,
             Binop::Lor => 12,
-            Binop::Assign => 14,
+            Binop::Assign
+            | Binop::AssignAdd
+            | Binop::AssignSub
+            | Binop::AssignMul
+            | Binop::AssignDiv => 14,
         }
     }
 

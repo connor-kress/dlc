@@ -83,20 +83,33 @@ fn compile_expr(
         }
         Expr::IntLit(val) => Arg::Literal((*val).into()),
         Expr::Binop { op, left, right } if op.is_assignment() => {
-            // TODO: +=, -=, etc.
             match &left.expr {
                 Expr::Id(id) => {
                     let index = ctx.get_local(&id.id).ok_or_else(|| {
                         format!("Undefined local variable \"{}\"", id.id)
                     })?;
                     let rhs = compile_expr(&right, ctx)?;
-                    ctx.ops.push(Op::LocalAssign {
-                        index,
-                        arg: rhs.clone(),
-                    });
+                    if let Some(assign_op) = op.assign_op()? {
+                        ctx.ops.push(Op::Binop {
+                            binop: assign_op,
+                            index,
+                            lhs: Arg::Local(index),
+                            rhs: rhs.clone(),
+                        });
+                    } else {
+                        ctx.ops.push(Op::LocalAssign {
+                            index,
+                            arg: rhs.clone(),
+                        });
+                    }
                     rhs
                 }
-                _ => todo!("Invalid left-hand side of assignment"),
+                _ => {
+                    return Err(format!(
+                        "Invalid left-hand side of assignment: `{}`",
+                        left,
+                    ));
+                }
             }
         }
         Expr::Binop { op, left, right } => {
