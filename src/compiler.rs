@@ -102,9 +102,25 @@ fn compile_expr(
             });
             Arg::Local(index)
         }
+        Expr::FuncCall { name, args } => {
+            let mut ir_args = Vec::new();
+            for arg in args.iter() {
+                ir_args.push(compile_expr(arg, ctx)?);
+            }
+            let Expr::Id(name) = &name.expr else {
+                // TODO: function pointers
+                return Err(format!("Invalid function name: `{}`", name.expr));
+            };
+            let index = ctx.add_tmp_local();
+            ctx.ops.push(Op::FuncCall {
+                func: name.id.clone(),
+                ret: index,
+                args: ir_args,
+            });
+            Arg::Local(index)
+        }
         other => {
-            println!("Missing compile_expr: {:?}", other);
-            todo!();
+            todo!("Missing compile_expr: {}", other);
         }
     };
     Ok(arg)

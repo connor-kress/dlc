@@ -48,9 +48,14 @@ pub fn generate_function<W: std::io::Write>(
 
     writeln!(out, "    pushq %rbp").unwrap();
     writeln!(out, "    movq %rsp, %rbp").unwrap();
+    let should_save_stack =
+        func.body.iter().any(|op| matches!(op, Op::FuncCall { .. }));
+    if should_save_stack {
+        writeln!(out, "    subq ${}, %rsp", func.stack_size).unwrap();
+    }
 
     if func.arg_count > ARG_REGISTERS.len() {
-        return Err(format!("Too many arguments for function {}", func.name));
+        return Err(format!("Too many parameters for function {}", func.name));
     }
     // load args onto stack
     for i in 0..func.arg_count {
@@ -103,7 +108,27 @@ pub fn generate_function<W: std::io::Write>(
                 // TODO: early returns
                 assert_eq!(i, func.body.len() - 1);
             }
+            Op::FuncCall {
+                func: func_name,
+                ret,
+                args,
+            } => {
+                if args.len() >= ARG_REGISTERS.len() {
+                    return Err(format!(
+                        "Too many arguments for function call to {}",
+                        func,
+                    ));
+                }
+                for (i, arg) in args.iter().enumerate() {
+                    load_arg(arg, ARG_REGISTERS[i], func, out);
+                }
+                writeln!(out, "    call {}", func_name).unwrap();
+                store_reg("rax", *ret, func, out);
+            }
         }
+    }
+    if should_save_stack {
+        writeln!(out, "    movq %rbp, %rsp").unwrap();
     }
     writeln!(out, "    popq %rbp").unwrap();
     writeln!(out, "    ret").unwrap();

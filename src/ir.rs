@@ -1,5 +1,5 @@
 use crate::lexer::Binop;
-use std::fmt;
+use std::fmt::{self, Write};
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -38,6 +38,11 @@ pub enum Op {
     Return {
         arg: Arg,
     },
+    FuncCall {
+        func: String,
+        ret: usize,
+        args: Vec<Arg>,
+    },
 }
 
 impl fmt::Display for Op {
@@ -54,6 +59,16 @@ impl fmt::Display for Op {
             }
             Op::Return { arg } => {
                 write!(f, "ret({})", arg)
+            }
+            Op::FuncCall { func, args, ret } => {
+                let mut args_str = String::new();
+                for (i, arg) in args.iter().enumerate() {
+                    if i != 0 {
+                        args_str.push_str(", ");
+                    }
+                    write!(&mut args_str, "{}", arg)?;
+                }
+                write!(f, "Call({}, {}, [{}])", func, ret, args_str)
             }
         }
     }
