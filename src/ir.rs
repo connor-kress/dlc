@@ -43,6 +43,18 @@ pub enum Op {
         ret: usize,
         args: Vec<Arg>,
     },
+    Label(String),
+    Jump {
+        label: String,
+    },
+    JumpIfZero {
+        label: String,
+        arg: Arg,
+    },
+    JumpIfNotZero {
+        label: String,
+        arg: Arg,
+    },
 }
 
 impl fmt::Display for Op {
@@ -69,6 +81,14 @@ impl fmt::Display for Op {
                     write!(&mut args_str, "{arg}")?;
                 }
                 write!(f, "Call({func}, {ret}, [{args_str}])")
+            }
+            Op::Label(label) => write!(f, "Label({label:?})"),
+            Op::Jump { label } => write!(f, "Jump({label:?})"),
+            Op::JumpIfZero { label, arg } => {
+                write!(f, "JumpIfZero({label:?}, {arg})")
+            }
+            Op::JumpIfNotZero { label, arg } => {
+                write!(f, "JumpIfNotZero({label:?}, {arg})")
             }
         }
     }

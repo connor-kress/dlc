@@ -6,18 +6,26 @@ use crate::{
 #[derive(Clone, Debug)]
 struct ProgramContext {
     pub string_literals: Vec<String>,
+    label_count: usize,
 }
 
 impl ProgramContext {
     fn new() -> Self {
         Self {
             string_literals: Vec::new(),
+            label_count: 0,
         }
     }
 
     fn add_string_literal(&mut self, s: String) -> usize {
         self.string_literals.push(s);
         self.string_literals.len() - 1
+    }
+
+    fn new_label(&mut self, name: &str) -> String {
+        let label = format!(".{name}{count}", count = self.label_count);
+        self.label_count += 1;
+        label
     }
 }
 
@@ -182,6 +190,34 @@ fn compile_stmt(
                 fn_ctx.ops.push(Op::Return {
                     arg: Arg::Literal(0),
                 });
+            }
+        }
+        Statement::If {
+            cond,
+            if_block,
+            else_block,
+        } => {
+            let cond = compile_expr(cond, fn_ctx, proc_ctx)?;
+            let otherwise_label = proc_ctx.new_label("otherwise");
+            fn_ctx.ops.push(Op::JumpIfZero {
+                label: otherwise_label.clone(),
+                arg: cond,
+            });
+            for stmt in if_block.iter() {
+                compile_stmt(&stmt, fn_ctx, proc_ctx)?;
+            }
+            if let Some(else_block) = else_block {
+                let after_else_label = proc_ctx.new_label("after_else");
+                fn_ctx.ops.push(Op::Jump {
+                    label: after_else_label.clone(),
+                });
+                fn_ctx.ops.push(Op::Label(otherwise_label));
+                for stmt in else_block.iter() {
+                    compile_stmt(&stmt, fn_ctx, proc_ctx)?;
+                }
+                fn_ctx.ops.push(Op::Label(after_else_label));
+            } else {
+                fn_ctx.ops.push(Op::Label(otherwise_label));
             }
         }
         _ => todo!(),

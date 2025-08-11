@@ -182,6 +182,26 @@ pub fn emit_function<W: std::io::Write>(
                 writeln!(out, "    call {func_name}").unwrap();
                 store_reg("rax", *ret, func, out);
             }
+
+            Op::Label(label) => {
+                writeln!(out, "    {label}:").unwrap();
+            }
+
+            Op::Jump { label } => {
+                writeln!(out, "    jmp {label}").unwrap();
+            }
+
+            Op::JumpIfZero { arg, label } => {
+                load_arg(arg, "rax", func, out);
+                writeln!(out, "    testq %rax, %rax").unwrap();
+                writeln!(out, "    je {label}").unwrap();
+            }
+
+            Op::JumpIfNotZero { arg, label } => {
+                load_arg(arg, "rax", func, out);
+                writeln!(out, "    testq %rax, %rax").unwrap();
+                writeln!(out, "    jne {label}").unwrap();
+            }
         }
     }
 
