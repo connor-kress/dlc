@@ -47,7 +47,6 @@ pub fn emit_function<W: std::io::Write>(
     writeln!(out, ".globl {}", func.name).unwrap();
     writeln!(out, ".type {}, @function", func.name).unwrap();
     writeln!(out, "{}:", func.name).unwrap();
-
     writeln!(out, "    pushq %rbp").unwrap();
     writeln!(out, "    movq %rsp, %rbp").unwrap();
     let should_save_stack =
@@ -70,6 +69,7 @@ pub fn emit_function<W: std::io::Write>(
                 let offset = func.slot_offset(*index);
                 writeln!(out, "    movq %rax, {offset}(%rbp)").unwrap();
             }
+
             Op::Binop {
                 binop,
                 index,
@@ -97,15 +97,73 @@ pub fn emit_function<W: std::io::Write>(
                         // rax = quotient, rdx = remainder
                         writeln!(out, "    idivq %rcx").unwrap();
                     }
+                    Binop::Eq => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    cmpq %rdx, %rax").unwrap();
+                        writeln!(out, "    sete %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Neq => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    cmpq %rdx, %rax").unwrap();
+                        writeln!(out, "    setne %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Lt => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    cmpq %rdx, %rax").unwrap();
+                        writeln!(out, "    setl %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Gt => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    cmpq %rdx, %rax").unwrap();
+                        writeln!(out, "    setg %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Le => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    cmpq %rdx, %rax").unwrap();
+                        writeln!(out, "    setle %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Ge => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    cmpq %rdx, %rax").unwrap();
+                        writeln!(out, "    setge %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    // TODO: short-circuit for land/lor
+                    Binop::Land => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    andq %rdx, %rax").unwrap();
+                        writeln!(out, "    setne %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Lor => {
+                        load_arg(rhs, "rdx", func, out);
+                        writeln!(out, "    orq %rdx, %rax").unwrap();
+                        writeln!(out, "    setne %al").unwrap();
+                        writeln!(out, "    movzbq %al, %rax").unwrap();
+                    }
+                    Binop::Assign
+                    | Binop::AssignAdd
+                    | Binop::AssignSub
+                    | Binop::AssignMul
+                    | Binop::AssignDiv => {
+                        unreachable!("assignment ops should already be handled")
+                    }
                     _ => todo!("binop op"),
                 }
                 store_reg("rax", *index, func, out);
             }
+
             Op::Return { arg } => {
                 load_arg(arg, "rax", func, out);
                 // TODO: early returns
                 assert_eq!(i, func.body.len() - 1);
             }
+
             Op::FuncCall {
                 func: func_name,
                 ret,
@@ -126,6 +184,7 @@ pub fn emit_function<W: std::io::Write>(
             }
         }
     }
+
     if should_save_stack {
         writeln!(out, "    movq %rbp, %rsp").unwrap();
     }
