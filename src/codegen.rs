@@ -113,8 +113,7 @@ pub fn emit_function<W: std::io::Write>(
             } => {
                 if args.len() >= ARG_REGISTERS.len() {
                     return Err(format!(
-                        "Too many arguments for function call to {}",
-                        func,
+                        "Too many arguments for function call to {func}"
                     ));
                 }
                 for (i, arg) in args.iter().enumerate() {
@@ -122,7 +121,7 @@ pub fn emit_function<W: std::io::Write>(
                 }
                 // TODO: set %eax for variadic functions
                 // Set value to the number of vector registers
-                writeln!(out, "    call {}", func_name).unwrap();
+                writeln!(out, "    call {func_name}").unwrap();
                 store_reg("rax", *ret, func, out);
             }
         }

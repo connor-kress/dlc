@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Write};
 
 use crate::lexer::{Binop, Loc, PrimitiveType, Uniop};
 
@@ -34,9 +34,9 @@ pub enum Type {
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Type::Primitive(ty) => write!(f, "{:?}", ty),
-            Type::Id(id) => write!(f, "Id({})", id),
-            Type::Ptr(ty) => write!(f, "Ptr({})", ty),
+            Type::Primitive(ty) => write!(f, "{ty:?}"),
+            Type::Id(id) => write!(f, "Id({id})"),
+            Type::Ptr(ty) => write!(f, "Ptr({ty})"),
         }
     }
 }
@@ -89,22 +89,25 @@ impl Expr {
         _indent: usize,
     ) -> fmt::Result {
         match self {
-            Expr::Id(id) => write!(f, "{}", id),
-            Expr::IntLit(n) => write!(f, "{}", n),
-            Expr::FloatLit(n) => write!(f, "{}", n),
-            Expr::StrLit(s) => write!(f, "\"{}\"", s),
+            Expr::Id(id) => write!(f, "{id}"),
+            Expr::IntLit(n) => write!(f, "{n}"),
+            Expr::FloatLit(n) => write!(f, "{n}"),
+            Expr::StrLit(s) => write!(f, "{s:?}"),
             Expr::Uniop { op, arg } => {
-                write!(f, "{:?}({})", op, arg)
+                write!(f, "{op:?}({arg})")
             }
             Expr::Binop { op, left, right } => {
-                write!(f, "{:?}({}, {})", op, left, right)
+                write!(f, "{op:?}({left}, {right})")
             }
             Expr::FuncCall { name, args } => {
-                write!(f, "FuncCall({}", name)?;
-                for arg in args {
-                    write!(f, ", {}", arg)?;
+                let mut args_str = String::new();
+                for (i, arg) in args.iter().enumerate() {
+                    if i != 0 {
+                        args_str.push_str(", ");
+                    }
+                    write!(&mut args_str, "{arg}")?;
                 }
-                write!(f, ")")
+                write!(f, "FuncCall({name}, [{args_str}])")
             }
         }
     }
@@ -158,13 +161,12 @@ impl fmt::Display for ParamList {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}: {}", id.id, type_)?;
+            write!(f, "{name}: {type_}", name = id.id)?;
         }
         write!(f, ")")
     }
 }
 
-// This is temporary, everything should be an expression
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -206,26 +208,26 @@ impl Statement {
         f: &mut fmt::Formatter,
         indent: usize,
     ) -> fmt::Result {
-        let indent_str = " ".repeat(indent * INDENT_WIDTH);
+        let i_str = " ".repeat(indent * INDENT_WIDTH);
         match self {
             Statement::Expr(expr) => {
-                write!(f, "{}", indent_str)?;
+                write!(f, "{i_str}")?;
                 expr.fmt_with_indent(f, indent)?;
             }
             Statement::Block(statements) => {
-                write!(f, "{}Block:", indent_str)?;
+                write!(f, "{i_str}Block:")?;
                 for statement in statements {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
             Statement::VarDecl { name, type_, val } => {
-                write!(f, "{}VarDecl({}", indent_str, name)?;
+                write!(f, "{i_str}VarDecl({name}")?;
                 if let Some(type_) = type_ {
-                    write!(f, ": {}", type_)?;
+                    write!(f, ": {type_}")?;
                 }
                 if let Some(val) = val {
-                    write!(f, ", {}", val)?;
+                    write!(f, ", {val}")?;
                 }
                 write!(f, ")")?;
             }
@@ -234,13 +236,13 @@ impl Statement {
                 if_block,
                 else_block,
             } => {
-                write!(f, "{}If({}):", indent_str, cond)?;
+                write!(f, "{i_str}If({cond}):")?;
                 for statement in if_block {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
                 if let Some(else_block) = else_block {
-                    write!(f, "\n{}Else:", indent_str)?;
+                    write!(f, "\n{i_str}Else:")?;
                     for statement in else_block {
                         write!(f, "\n")?;
                         statement.fmt_with_indent(f, indent + 1)?;
@@ -248,14 +250,14 @@ impl Statement {
                 }
             }
             Statement::Loop { body } => {
-                write!(f, "{}Loop:", indent_str)?;
+                write!(f, "{i_str}Loop:")?;
                 for statement in body {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
             Statement::WhileLoop { pred, body } => {
-                write!(f, "{}While({}):", indent_str, pred)?;
+                write!(f, "{i_str}While({pred}):")?;
                 for statement in body {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
@@ -267,18 +269,18 @@ impl Statement {
                 step,
                 body,
             } => {
-                write!(f, "{}For({}, {}, {}):", indent_str, start, pred, step)?;
+                write!(f, "{i_str}For({start}, {pred}, {step}):")?;
                 for statement in body {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
-            Statement::Break => write!(f, "{}Break", indent_str)?,
-            Statement::Continue => write!(f, "{}Continue", indent_str)?,
+            Statement::Break => write!(f, "{i_str}Break")?,
+            Statement::Continue => write!(f, "{i_str}Continue")?,
             Statement::Return { val } => {
-                write!(f, "{}Return(", indent_str)?;
+                write!(f, "{i_str}Return(")?;
                 if let Some(val) = val {
-                    write!(f, "{})", val)?;
+                    write!(f, "{val})")?;
                 } else {
                     write!(f, "Void)")?;
                 }
@@ -339,11 +341,10 @@ impl Function {
         f: &mut fmt::Formatter,
         indent: usize,
     ) -> fmt::Result {
-        let indent_str = " ".repeat(indent * INDENT_WIDTH);
-        write!(f, "{}", indent_str)?;
+        let i_str = " ".repeat(indent * INDENT_WIDTH);
         write!(
             f,
-            "{}({}, {}):\n",
+            "{i_str}{}({}, {}):\n",
             self.name, self.param_list, self.ret_type
         )?;
         for statement in &self.body {

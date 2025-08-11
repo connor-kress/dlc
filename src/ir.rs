@@ -17,7 +17,7 @@ impl fmt::Display for Arg {
         match self {
             Arg::Local(i) => write!(f, "Local({i})"),
             Arg::Literal(i) => write!(f, "{i}"),
-            Arg::DataLabel(s) => write!(f, "DataLabel(\"{s}\")"),
+            Arg::DataLabel(s) => write!(f, "DataLabel({s:?})"),
         }
     }
 }
@@ -66,7 +66,7 @@ impl fmt::Display for Op {
                     if i != 0 {
                         args_str.push_str(", ");
                     }
-                    write!(&mut args_str, "{}", arg)?;
+                    write!(&mut args_str, "{arg}")?;
                 }
                 write!(f, "Call({func}, {ret}, [{args_str}])")
             }

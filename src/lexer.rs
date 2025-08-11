@@ -331,19 +331,32 @@ fn read_numeric_literal(l: &mut Lexer) -> TokenWithLoc {
     TokenWithLoc::new(Token::NumLit(acc), Loc::new(start, end))
 }
 
-fn read_string_literal(l: &mut Lexer) -> TokenWithLoc {
+fn read_string_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
     let (_, start) = l.get_char_with_point().unwrap();
     let mut acc = String::new();
     let mut end = start;
     while let Some(c) = l.peek_char() {
-        if c != '"' {
-            acc.push(l.get_char().unwrap());
-        } else {
-            (_, end) = l.get_char_with_point().unwrap();
-            break;
+        match c {
+            '"' => {
+                (_, end) = l.get_char_with_point().unwrap();
+                break;
+            }
+            '\\' => {
+                l.get_char().unwrap();
+                match l.get_char().unwrap() {
+                    'n' => acc.push('\n'),
+                    'r' => acc.push('\r'),
+                    't' => acc.push('\t'),
+                    '\\' => acc.push('\\'),
+                    _ => return Err(format!("Invalid escape sequence: \\{c}")),
+                }
+            }
+            _ => {
+                acc.push(l.get_char().unwrap());
+            }
         }
     }
-    TokenWithLoc::new(Token::StrLit(acc), Loc::new(start, end))
+    Ok(TokenWithLoc::new(Token::StrLit(acc), Loc::new(start, end)))
 }
 
 fn convert_operator_string(s: &str) -> Result<Token, String> {
@@ -354,7 +367,7 @@ fn convert_operator_string(s: &str) -> Result<Token, String> {
     } else if let Some(token) = UNARY_OPS.get(s) {
         Token::Uniop(*token)
     } else {
-        return Err(format!("Invalid operator: {}", s));
+        return Err(format!("Invalid operator: {s}"));
     };
     Ok(token)
 }
@@ -396,7 +409,7 @@ fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
     } else if next.is_numeric() {
         read_numeric_literal(l)
     } else if next == '"' {
-        read_string_literal(l)
+        read_string_literal(l)?
     } else {
         read_operator(l)?
     };
