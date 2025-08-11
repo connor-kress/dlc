@@ -4,6 +4,24 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
+struct ProgramContext {
+    pub string_literals: Vec<String>,
+}
+
+impl ProgramContext {
+    fn new() -> Self {
+        Self {
+            string_literals: Vec::new(),
+        }
+    }
+
+    fn add_string_literal(&mut self, s: String) -> usize {
+        self.string_literals.push(s);
+        self.string_literals.len() - 1
+    }
+}
+
+#[derive(Clone, Debug)]
 struct FnContext {
     pub stack: Vec<Option<String>>,
     pub ops: Vec<Op>,
@@ -48,34 +66,39 @@ impl FnContext {
 
 fn compile_expr(
     expr: &ExprWithLoc,
-    ctx: &mut FnContext,
+    fn_ctx: &mut FnContext,
+    proc_ctx: &mut ProgramContext,
 ) -> Result<Arg, String> {
     // Should the stack have optional strings for unamed temp values?
     // Should there be a separate IRBinop/Uniop type?
     let arg = match &expr.expr {
         Expr::Id(id) => {
-            let index = ctx.get_local(&id.id).ok_or_else(|| {
+            let index = fn_ctx.get_local(&id.id).ok_or_else(|| {
                 format!("Undefined local variable \"{}\"", id.id)
             })?;
             Arg::Local(index)
         }
         Expr::IntLit(val) => Arg::Literal((*val).into()),
+        Expr::StrLit(s) => {
+            let index = proc_ctx.add_string_literal(s.clone());
+            Arg::DataLabel(format!(".STR{index}"))
+        }
         Expr::Binop { op, left, right } if op.is_assignment() => {
             match &left.expr {
                 Expr::Id(id) => {
-                    let index = ctx.get_local(&id.id).ok_or_else(|| {
+                    let index = fn_ctx.get_local(&id.id).ok_or_else(|| {
                         format!("Undefined local variable \"{}\"", id.id)
                     })?;
-                    let rhs = compile_expr(&right, ctx)?;
+                    let rhs = compile_expr(&right, fn_ctx, proc_ctx)?;
                     if let Some(assign_op) = op.assign_op()? {
-                        ctx.ops.push(Op::Binop {
+                        fn_ctx.ops.push(Op::Binop {
                             binop: assign_op,
                             index,
                             lhs: Arg::Local(index),
                             rhs: rhs.clone(),
                         });
                     } else {
-                        ctx.ops.push(Op::LocalAssign {
+                        fn_ctx.ops.push(Op::LocalAssign {
                             index,
                             arg: rhs.clone(),
                         });
@@ -91,10 +114,10 @@ fn compile_expr(
             }
         }
         Expr::Binop { op, left, right } => {
-            let lhs = compile_expr(&left, ctx)?;
-            let rhs = compile_expr(&right, ctx)?;
-            let index = ctx.add_tmp_local();
-            ctx.ops.push(Op::Binop {
+            let lhs = compile_expr(&left, fn_ctx, proc_ctx)?;
+            let rhs = compile_expr(&right, fn_ctx, proc_ctx)?;
+            let index = fn_ctx.add_tmp_local();
+            fn_ctx.ops.push(Op::Binop {
                 binop: op.clone(),
                 index,
                 lhs,
@@ -105,14 +128,14 @@ fn compile_expr(
         Expr::FuncCall { name, args } => {
             let mut ir_args = Vec::new();
             for arg in args.iter() {
-                ir_args.push(compile_expr(arg, ctx)?);
+                ir_args.push(compile_expr(arg, fn_ctx, proc_ctx)?);
             }
             let Expr::Id(name) = &name.expr else {
                 // TODO: function pointers
                 return Err(format!("Invalid function name: `{}`", name.expr));
             };
-            let index = ctx.add_tmp_local();
-            ctx.ops.push(Op::FuncCall {
+            let index = fn_ctx.add_tmp_local();
+            fn_ctx.ops.push(Op::FuncCall {
                 func: name.id.clone(),
                 ret: index,
                 args: ir_args,
@@ -128,34 +151,35 @@ fn compile_expr(
 
 fn compile_stmt(
     stmt: &StatementWithLoc,
-    ctx: &mut FnContext,
+    fn_ctx: &mut FnContext,
+    proc_ctx: &mut ProgramContext,
 ) -> Result<(), String> {
     match &stmt.statement {
         Statement::Expr(expr) => {
-            let _ = compile_expr(expr, ctx)?;
+            let _ = compile_expr(expr, fn_ctx, proc_ctx)?;
         }
         Statement::VarDecl { name, val, .. } => {
             if let Some(val) = val {
-                let arg = compile_expr(val, ctx)?;
+                let arg = compile_expr(val, fn_ctx, proc_ctx)?;
                 let mut assigned_tmp = false;
                 if let Arg::Local(index) = &arg {
-                    if ctx.is_tmp_local(*index) {
-                        ctx.reassign_local(*index, name.id.clone());
+                    if fn_ctx.is_tmp_local(*index) {
+                        fn_ctx.reassign_local(*index, name.id.clone());
                         assigned_tmp = true;
                     }
                 }
                 if !assigned_tmp {
-                    let index = ctx.add_local(name.id.clone());
-                    ctx.ops.push(Op::LocalAssign { index, arg });
+                    let index = fn_ctx.add_local(name.id.clone());
+                    fn_ctx.ops.push(Op::LocalAssign { index, arg });
                 }
             }
         }
         Statement::Return { val } => {
             if let Some(val) = val {
-                let arg = compile_expr(val, ctx)?;
-                ctx.ops.push(Op::Return { arg });
+                let arg = compile_expr(val, fn_ctx, proc_ctx)?;
+                fn_ctx.ops.push(Op::Return { arg });
             } else {
-                ctx.ops.push(Op::Return {
+                fn_ctx.ops.push(Op::Return {
                     arg: Arg::Literal(0),
                 });
             }
@@ -165,33 +189,40 @@ fn compile_stmt(
     Ok(())
 }
 
-fn compile_function(func: &Function) -> Result<IRFunction, String> {
-    let mut ctx = FnContext::new();
+fn compile_function(
+    func: &Function,
+    proc_ctx: &mut ProgramContext,
+) -> Result<IRFunction, String> {
+    let mut fn_ctx = FnContext::new();
     for param in func.param_list.params.iter() {
-        ctx.add_local(param.0.id.clone());
+        fn_ctx.add_local(param.0.id.clone());
     }
     for stmt in func.body.iter() {
-        compile_stmt(&stmt, &mut ctx)?;
+        compile_stmt(&stmt, &mut fn_ctx, proc_ctx)?;
     }
-    println!("stack: {:?}", ctx.stack);
+    println!("stack: {:?}", fn_ctx.stack);
     let arg_count = func.param_list.params.len();
     let ir_func = IRFunction::new(
         func.name.id.clone(),
         arg_count,
-        ctx.stack.len() - arg_count, // local_count
-        ctx.ops,
+        fn_ctx.stack.len() - arg_count, // local_count
+        fn_ctx.ops,
     );
     println!("{}", ir_func);
     Ok(ir_func)
 }
 
 pub fn compile_program(funcs: &Vec<Function>) -> Result<IRProgram, String> {
+    let mut proc_ctx = ProgramContext::new();
     let mut ir_funcs = Vec::new();
     for func in funcs.iter() {
-        let ir_func = compile_function(func)?;
+        let ir_func = compile_function(func, &mut proc_ctx)?;
         ir_funcs.push(ir_func);
     }
-    let program = IRProgram::new(ir_funcs);
+    let program = IRProgram {
+        functions: ir_funcs,
+        string_literals: proc_ctx.string_literals,
+    };
     Ok(program)
 }
 

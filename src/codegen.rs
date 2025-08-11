@@ -16,13 +16,15 @@ fn load_arg<W: std::io::Write>(
     match arg {
         Arg::Local(i) => {
             assert!(*i < func.stack_size, "load_arg: index out of bounds");
-            writeln!(out, "    movq {}(%rbp), %{}", func.slot_offset(*i), reg)
-                .unwrap();
+            let offset = func.slot_offset(*i);
+            writeln!(out, "    movq {offset}(%rbp), %{reg}").unwrap();
         }
         Arg::Literal(val) => {
-            writeln!(out, "    movq ${}, %{}", val, reg).unwrap();
+            writeln!(out, "    movq ${val}, %{reg}").unwrap();
         }
-        Arg::DataOffset(_) => todo!("load data offset"),
+        Arg::DataLabel(s) => {
+            writeln!(out, "    movq ${s}, %{reg}").unwrap();
+        }
     }
 }
 
@@ -33,12 +35,12 @@ fn store_reg<W: std::io::Write>(
     out: &mut W,
 ) {
     assert!(index < func.stack_size, "store_reg: index out of bounds");
-    writeln!(out, "    movq %{}, {}(%rbp)", reg, func.slot_offset(index))
-        .unwrap();
+    let offset = func.slot_offset(index);
+    writeln!(out, "    movq %{reg}, {offset}(%rbp)").unwrap();
 }
 
 /// Generate an x86_64 assembly function from an IR function.
-pub fn generate_function<W: std::io::Write>(
+pub fn emit_function<W: std::io::Write>(
     func: &IRFunction,
     out: &mut W,
 ) -> Result<(), String> {
@@ -65,12 +67,8 @@ pub fn generate_function<W: std::io::Write>(
         match op {
             Op::LocalAssign { index, arg } => {
                 load_arg(arg, "rax", func, out);
-                writeln!(
-                    out,
-                    "    movq %rax, {}(%rbp)",
-                    func.slot_offset(*index)
-                )
-                .unwrap();
+                let offset = func.slot_offset(*index);
+                writeln!(out, "    movq %rax, {offset}(%rbp)").unwrap();
             }
             Op::Binop {
                 binop,
@@ -122,6 +120,8 @@ pub fn generate_function<W: std::io::Write>(
                 for (i, arg) in args.iter().enumerate() {
                     load_arg(arg, ARG_REGISTERS[i], func, out);
                 }
+                // TODO: set %eax for variadic functions
+                // Set value to the number of vector registers
                 writeln!(out, "    call {}", func_name).unwrap();
                 store_reg("rax", *ret, func, out);
             }
@@ -136,16 +136,25 @@ pub fn generate_function<W: std::io::Write>(
 }
 
 /// Generate an x86_64 assembly program from an IR program.
-pub fn generate_program<W: std::io::Write>(
+pub fn emit_program<W: std::io::Write>(
     program: &IRProgram,
     out: &mut W,
 ) -> Result<(), String> {
+    if !program.string_literals.is_empty() {
+        writeln!(out, ".section .rodata").unwrap();
+        for (i, str_lit) in program.string_literals.iter().enumerate() {
+            writeln!(out, ".STR{i}:").unwrap();
+            writeln!(out, "    .string {str_lit:?}").unwrap();
+        }
+        write!(out, "\n").unwrap();
+    }
+
     write!(out, ".text\n\n").unwrap();
     for (i, func) in program.functions.iter().enumerate() {
         if i != 0 {
             write!(out, "\n").unwrap();
         }
-        generate_function(func, out)?;
+        emit_function(func, out)?;
     }
     Ok(())
 }

@@ -5,7 +5,7 @@ mod ir;
 mod lexer;
 mod parser;
 
-use codegen::generate_program;
+use codegen::emit_program;
 use compiler::compile_program;
 use lexer::tokenize_string;
 use parser::parse_program;
@@ -193,7 +193,7 @@ fn main() -> Result<(), String> {
     let obj_filename = parent_dir.join(format!("{}.o", input_basename));
     let mut file = File::create(&asm_filename)
         .map_err(|e| format!("Failed to create file: {}", e))?;
-    generate_program(&program, &mut file)?;
+    emit_program(&program, &mut file)?;
 
     assemble_and_link_program(&asm_filename, &obj_filename, &cli.output_path)?;
 

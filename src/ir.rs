@@ -8,16 +8,16 @@ pub enum Arg {
     Local(usize),
     /// Int literal with raw value
     Literal(i64),
-    /// Byte offset in global data section (statics and globals)
-    DataOffset(usize),
+    /// Data label into .data or .rodata section
+    DataLabel(String),
 }
 
 impl fmt::Display for Arg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Arg::Local(i) => write!(f, "Local({})", i),
-            Arg::Literal(i) => write!(f, "{}", i),
-            Arg::DataOffset(i) => write!(f, "DataOffset({})", i),
+            Arg::Local(i) => write!(f, "Local({i})"),
+            Arg::Literal(i) => write!(f, "{i}"),
+            Arg::DataLabel(s) => write!(f, "DataLabel(\"{s}\")"),
         }
     }
 }
@@ -53,12 +53,12 @@ impl fmt::Display for Op {
                 index,
                 lhs,
                 rhs,
-            } => write!(f, "Binop({:?}, {}, {}, {})", binop, index, lhs, rhs),
+            } => write!(f, "Binop({binop:?}, {index}, {lhs}, {rhs})"),
             Op::LocalAssign { index, arg } => {
-                write!(f, "LocalAssign({}, {})", index, arg)
+                write!(f, "LocalAssign({index}, {arg})")
             }
             Op::Return { arg } => {
-                write!(f, "ret({})", arg)
+                write!(f, "ret({arg})")
             }
             Op::FuncCall { func, args, ret } => {
                 let mut args_str = String::new();
@@ -68,7 +68,7 @@ impl fmt::Display for Op {
                     }
                     write!(&mut args_str, "{}", arg)?;
                 }
-                write!(f, "Call({}, {}, [{}])", func, ret, args_str)
+                write!(f, "Call({func}, {ret}, [{args_str}])")
             }
         }
     }
@@ -117,7 +117,7 @@ impl fmt::Display for IRFunction {
             self.name, self.arg_count, self.local_count, self.stack_size,
         )?;
         for op in &self.body {
-            writeln!(f, "    {}", op)?;
+            writeln!(f, "    {op}")?;
         }
         Ok(())
     }
@@ -126,16 +126,7 @@ impl fmt::Display for IRFunction {
 #[derive(Clone, Debug)]
 pub struct IRProgram {
     pub functions: Vec<IRFunction>,
-    // pub data: Vec<u8>,
-}
-
-impl IRProgram {
-    pub fn new(functions: Vec<IRFunction>) -> Self {
-        Self {
-            functions,
-            // data: Vec::new(),
-        }
-    }
+    pub string_literals: Vec<String>,
 }
 
 impl fmt::Display for IRProgram {
@@ -144,7 +135,7 @@ impl fmt::Display for IRProgram {
             if i != 0 {
                 write!(f, "\n")?;
             }
-            writeln!(f, "{}", func)?;
+            writeln!(f, "{func}")?;
         }
         Ok(())
     }
