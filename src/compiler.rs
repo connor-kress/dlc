@@ -220,6 +220,23 @@ fn compile_stmt(
                 fn_ctx.ops.push(Op::Label(otherwise_label));
             }
         }
+        Statement::WhileLoop { pred, body } => {
+            let loop_label = proc_ctx.new_label("loop");
+            let after_loop_label = proc_ctx.new_label("after_loop");
+            fn_ctx.ops.push(Op::Label(loop_label.clone()));
+            let cond = compile_expr(pred, fn_ctx, proc_ctx)?;
+            fn_ctx.ops.push(Op::JumpIfZero {
+                label: after_loop_label.clone(),
+                arg: cond,
+            });
+            for stmt in body.iter() {
+                compile_stmt(&stmt, fn_ctx, proc_ctx)?;
+            }
+            fn_ctx.ops.push(Op::Jump {
+                label: loop_label.clone(),
+            });
+            fn_ctx.ops.push(Op::Label(after_loop_label));
+        }
         _ => todo!(),
     }
     Ok(())

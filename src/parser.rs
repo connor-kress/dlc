@@ -339,9 +339,7 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
         }
         Token::If => {
             let if_start = p.expect_token(Token::If)?.loc.start;
-            p.expect_token(Token::Lparen)?;
             let cond = parse_expression(p)?;
-            p.expect_token(Token::Rparen)?;
             p.expect_token(Token::Lcurly)?;
             let mut if_block = Vec::new();
             while p.peek_token()?.token != Token::Rcurly {
@@ -376,7 +374,23 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
             todo!("for loop statement")
         }
         Token::While => {
-            todo!("while loop statement")
+            let while_start = p.expect_token(Token::While)?.loc.start;
+            let pred = parse_expression(p)?;
+            p.expect_token(Token::Lcurly)?;
+            let mut body = Vec::new();
+            while p.peek_token()?.token != Token::Rcurly {
+                let statement = parse_statement(p)?;
+                body.push(statement);
+            }
+            let while_end = p.expect_token(Token::Rcurly)?.loc.end;
+            let loc = Loc::new(while_start, while_end);
+            StatementWithLoc::new(
+                Statement::WhileLoop {
+                    pred: Box::new(pred),
+                    body,
+                },
+                loc,
+            )
         }
         Token::Return => {
             let start = p.expect_token(Token::Return)?.loc.start;
