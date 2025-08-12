@@ -340,22 +340,12 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
         Token::If => {
             let if_start = p.expect_token(Token::If)?.loc.start;
             let cond = parse_expression(p)?;
-            p.expect_token(Token::Lcurly)?;
-            let mut if_block = Vec::new();
-            while p.peek_token()?.token != Token::Rcurly {
-                let statement = parse_statement(p)?;
-                if_block.push(statement);
-            }
-            let mut if_end = p.expect_token(Token::Rcurly)?.loc.end;
+            let (if_block, if_block_loc) = parse_block(p)?;
+            let mut if_end = if_block_loc.end;
             let else_block = if p.peek_token()?.token == Token::Else {
                 p.advance().unwrap();
-                p.expect_token(Token::Lcurly)?;
-                let mut else_block = Vec::new();
-                while p.peek_token()?.token != Token::Rcurly {
-                    let statement = parse_statement(p)?;
-                    else_block.push(statement);
-                }
-                if_end = p.expect_token(Token::Rcurly)?.loc.end;
+                let (else_block, else_block_loc) = parse_block(p)?;
+                if_end = else_block_loc.end;
                 Some(else_block)
             } else {
                 None
@@ -376,14 +366,8 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
         Token::While => {
             let while_start = p.expect_token(Token::While)?.loc.start;
             let pred = parse_expression(p)?;
-            p.expect_token(Token::Lcurly)?;
-            let mut body = Vec::new();
-            while p.peek_token()?.token != Token::Rcurly {
-                let statement = parse_statement(p)?;
-                body.push(statement);
-            }
-            let while_end = p.expect_token(Token::Rcurly)?.loc.end;
-            let loc = Loc::new(while_start, while_end);
+            let (body, body_loc) = parse_block(p)?;
+            let loc = Loc::new(while_start, body_loc.end);
             StatementWithLoc::new(
                 Statement::WhileLoop {
                     pred: Box::new(pred),
@@ -422,6 +406,23 @@ fn parse_statement(p: &mut Parser) -> Result<StatementWithLoc, String> {
         }
     };
     Ok(statement)
+}
+
+fn parse_block(p: &mut Parser) -> Result<(Vec<StatementWithLoc>, Loc), String> {
+    let peek = p.peek_token()?;
+    if matches!(peek.token, Token::Lcurly) {
+        let start = p.expect_token(Token::Lcurly)?.loc.start;
+        let mut body = Vec::new();
+        while p.peek_token()?.token != Token::Rcurly {
+            body.push(parse_statement(p)?);
+        }
+        let end = p.expect_token(Token::Rcurly)?.loc.end;
+        Ok((body, Loc::new(start, end)))
+    } else {
+        let statement = parse_statement(p)?;
+        let loc = statement.loc.clone();
+        Ok((vec![statement], loc))
+    }
 }
 
 fn parse_type(p: &mut Parser) -> Result<TypeWithLoc, String> {
@@ -469,30 +470,20 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
         let type_ = parse_type(p)?;
         params.push((id, type_));
     }
-    p.expect_token(Token::Rparen)?;
+    let empty_type_loc = p.expect_token(Token::Rparen)?.loc;
     let peek = p.peek_token()?;
     let ret_type = match peek.token {
         Token::ThinArrow => {
             p.advance().unwrap();
             parse_type(p)?
         }
-        Token::Lcurly => {
-            TypeWithLoc::new(Type::Primitive(PrimitiveType::Void), peek.loc)
-        }
-        _ => {
-            return Err(format!(
-                "Expected '->' or '{{' after parameter list, got {:?}",
-                peek.token,
-            ));
-        }
+        _ => TypeWithLoc::new(
+            Type::Primitive(PrimitiveType::Void),
+            empty_type_loc,
+        ),
     };
-    p.expect_token(Token::Lcurly)?;
-    let mut body = Vec::new();
-    while p.peek_token()?.token != Token::Rcurly {
-        let statement = parse_statement(p)?;
-        body.push(statement);
-    }
-    let fn_end = p.expect_token(Token::Rcurly)?.loc.end;
+    let (body, body_loc) = parse_block(p)?;
+    let fn_end = body_loc.end;
     Ok(Function {
         name,
         param_list: ParamList { params },
