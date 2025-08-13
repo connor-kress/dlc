@@ -274,6 +274,19 @@ fn parse_expression_at_precedence(
                     loc,
                 );
             }
+            Token::Lbrack => {
+                p.advance().unwrap();
+                let expr = parse_expression(p)?;
+                let end = p.expect_token(Token::Rbrack)?.loc.end;
+                let loc = Loc::new(acc.loc.start, end);
+                acc = ExprWithLoc::new(
+                    Expr::Index {
+                        array: Box::new(acc),
+                        index: Box::new(expr),
+                    },
+                    loc,
+                );
+            }
             Token::Binop(op) => {
                 if op.precedence() > precedence {
                     break;

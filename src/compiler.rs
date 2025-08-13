@@ -1,7 +1,7 @@
 use crate::{
     ast::{Expr, ExprWithLoc, Function, Statement, StatementWithLoc},
     ir::{Arg, IRFunction, IRProgram, Op},
-    lexer::Uniop,
+    lexer::{Binop, Loc, Uniop},
 };
 
 #[derive(Clone, Debug)]
@@ -71,6 +71,39 @@ impl FnContext {
             }
         })
     }
+}
+
+fn convert_index_expr_to_deref(
+    array: &Box<ExprWithLoc>,
+    index: &Box<ExprWithLoc>,
+    loc: Loc,
+) -> Result<ExprWithLoc, String> {
+    let offset_in_bytes = ExprWithLoc::new(
+        Expr::Binop {
+            op: Binop::Mul,
+            left: index.clone(),
+            right: Box::new(ExprWithLoc::new(
+                Expr::IntLit(8),
+                index.loc.clone(),
+            )),
+        },
+        index.loc.clone(),
+    );
+    let index_expr = ExprWithLoc::new(
+        Expr::Binop {
+            op: Binop::Add,
+            left: array.clone(),
+            right: Box::new(offset_in_bytes),
+        },
+        index.loc.clone(),
+    );
+    Ok(ExprWithLoc::new(
+        Expr::Uniop {
+            op: Uniop::Deref,
+            arg: Box::new(index_expr),
+        },
+        loc,
+    ))
 }
 
 fn compile_expr(
@@ -147,6 +180,22 @@ fn compile_expr(
                         rhs
                     }
                 }
+                Expr::Index { array, index } => {
+                    let index_expr = convert_index_expr_to_deref(
+                        array,
+                        index,
+                        expr.loc.clone(),
+                    )?;
+                    let assignment_expr = ExprWithLoc::new(
+                        Expr::Binop {
+                            op: op.clone(),
+                            left: Box::new(index_expr),
+                            right: right.clone(),
+                        },
+                        expr.loc.clone(),
+                    );
+                    compile_expr(&assignment_expr, fn_ctx, proc_ctx)?
+                }
                 _ => {
                     return Err(format!(
                         "Invalid left-hand side of assignment: `{}`",
@@ -193,6 +242,11 @@ fn compile_expr(
                 args: ir_args,
             });
             Arg::Local(index)
+        }
+        Expr::Index { array, index } => {
+            let index_expr =
+                convert_index_expr_to_deref(array, index, expr.loc.clone())?;
+            compile_expr(&index_expr, fn_ctx, proc_ctx)?
         }
         other => {
             todo!("Missing compile_expr: {}", other);

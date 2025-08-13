@@ -80,6 +80,10 @@ pub enum Expr {
         name: Box<ExprWithLoc>,
         args: Vec<ExprWithLoc>,
     },
+    Index {
+        array: Box<ExprWithLoc>,
+        index: Box<ExprWithLoc>,
+    },
 }
 
 impl Expr {
@@ -108,6 +112,9 @@ impl Expr {
                     write!(&mut args_str, "{arg}")?;
                 }
                 write!(f, "FuncCall({name}, [{args_str}])")
+            }
+            Expr::Index { array, index } => {
+                write!(f, "Index({array}, {index})")
             }
         }
     }
