@@ -211,21 +211,29 @@ fn compile_stmt(
             let _ = compile_expr(expr, fn_ctx, proc_ctx)?;
         }
         Statement::VarDecl { name, val, .. } => {
-            if let Some(val) = val {
-                let arg = compile_expr(val, fn_ctx, proc_ctx)?;
-                let mut assigned_tmp = false;
-                if let Arg::Local(index) = &arg {
-                    if fn_ctx.is_tmp_local(*index) {
-                        fn_ctx.reassign_local(*index, name.id.clone());
-                        assigned_tmp = true;
-                    }
-                }
-                if !assigned_tmp {
-                    let index = fn_ctx.add_local(name.id.clone());
+            match (fn_ctx.get_local(&name.id), val) {
+                (Some(index), Some(val)) => {
+                    let arg = compile_expr(val, fn_ctx, proc_ctx)?;
                     fn_ctx.ops.push(Op::LocalAssign { index, arg });
                 }
-            } else {
-                let _ = fn_ctx.add_local(name.id.clone());
+                (Some(_index), None) => {}
+                (None, Some(val)) => {
+                    let arg = compile_expr(val, fn_ctx, proc_ctx)?;
+                    let mut assigned_tmp = false;
+                    if let Arg::Local(index) = &arg {
+                        if fn_ctx.is_tmp_local(*index) {
+                            fn_ctx.reassign_local(*index, name.id.clone());
+                            assigned_tmp = true;
+                        }
+                    }
+                    if !assigned_tmp {
+                        let index = fn_ctx.add_local(name.id.clone());
+                        fn_ctx.ops.push(Op::LocalAssign { index, arg });
+                    }
+                }
+                (None, None) => {
+                    let _ = fn_ctx.add_local(name.id.clone());
+                }
             }
         }
         Statement::Return { val } => {
