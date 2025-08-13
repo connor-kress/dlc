@@ -10,6 +10,8 @@ pub enum Arg {
     Literal(i64),
     /// Data label into .data or .rodata section
     DataLabel(String),
+    // Dereference a pointer
+    Deref(Box<Arg>),
 }
 
 impl fmt::Display for Arg {
@@ -18,6 +20,7 @@ impl fmt::Display for Arg {
             Arg::Local(i) => write!(f, "Local({i})"),
             Arg::Literal(i) => write!(f, "{i}"),
             Arg::DataLabel(s) => write!(f, "DataLabel({s:?})"),
+            Arg::Deref(arg) => write!(f, "Deref({arg})"),
         }
     }
 }

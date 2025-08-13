@@ -123,24 +123,22 @@ fn compile_expr(
                     let ptr_index = fn_ctx.add_tmp_local();
                     fn_ctx.ops.push(Op::LocalAssign {
                         index: ptr_index,
-                        arg: ptr,
+                        arg: ptr.clone(),
                     });
                     let rhs = compile_expr(&right, fn_ctx, proc_ctx)?;
-                    if let Some(_assign_op) = op.assign_op()? {
-                        // let val_index = fn_ctx.add_tmp_local();
-                        // fn_ctx.ops.push(Op::LocalAssign {
-                        //     index: val_index,
-                        //     arg: rhs.clone(),
-                        // });
-                        // compile_expr(&right, fn_ctx, proc_ctx)?;
-                        // fn_ctx.ops.push(Op::Binop {
-                        //     binop: assign_op,
-                        //     index: val_index,
-                        //     lhs: Arg::Local(val_index),
-                        //     rhs: rhs.clone(),
-                        // });
-                        todo!("deref assign + binop");
-                        // Arg::Local(val_index)
+                    if let Some(assign_op) = op.assign_op()? {
+                        let val_index = fn_ctx.add_tmp_local();
+                        fn_ctx.ops.push(Op::Binop {
+                            binop: assign_op,
+                            index: val_index,
+                            lhs: Arg::Deref(Box::new(ptr)),
+                            rhs: rhs.clone(),
+                        });
+                        fn_ctx.ops.push(Op::Store {
+                            index: ptr_index,
+                            arg: Arg::Local(val_index),
+                        });
+                        Arg::Local(val_index)
                     } else {
                         fn_ctx.ops.push(Op::Store {
                             index: ptr_index,

@@ -25,6 +25,10 @@ fn load_arg<W: std::io::Write>(
         Arg::DataLabel(s) => {
             writeln!(out, "    movq ${s}, %{reg}").unwrap();
         }
+        Arg::Deref(inner) => {
+            load_arg(inner, reg, func, out);
+            writeln!(out, "    movq (%{reg}), %{reg}").unwrap();
+        }
     }
 }
 
