@@ -1,4 +1,4 @@
-use crate::lexer::Binop;
+use crate::lexer::{Binop, Uniop};
 use std::fmt::{self, Write};
 
 #[allow(dead_code)]
@@ -29,11 +29,20 @@ pub enum Op {
         index: usize,
         arg: Arg,
     },
+    Store {
+        index: usize,
+        arg: Arg,
+    },
     Binop {
         binop: Binop,
         index: usize,
         lhs: Arg,
         rhs: Arg,
+    },
+    Uniop {
+        uniop: Uniop,
+        index: usize,
+        arg: Arg,
     },
     Return {
         arg: Arg,
@@ -66,8 +75,14 @@ impl fmt::Display for Op {
                 lhs,
                 rhs,
             } => write!(f, "Binop({binop:?}, {index}, {lhs}, {rhs})"),
+            Op::Uniop { uniop, index, arg } => {
+                write!(f, "Uniop({uniop:?}, {index}, {arg})")
+            }
             Op::LocalAssign { index, arg } => {
                 write!(f, "LocalAssign({index}, {arg})")
+            }
+            Op::Store { index, arg } => {
+                write!(f, "Store({index}, {arg})")
             }
             Op::Return { arg } => {
                 write!(f, "ret({arg})")

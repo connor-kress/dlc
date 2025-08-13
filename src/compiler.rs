@@ -1,6 +1,7 @@
 use crate::{
     ast::{Expr, ExprWithLoc, Function, Statement, StatementWithLoc},
     ir::{Arg, IRFunction, IRProgram, Op},
+    lexer::Uniop,
 };
 
 #[derive(Clone, Debug)]
@@ -105,13 +106,48 @@ fn compile_expr(
                             lhs: Arg::Local(index),
                             rhs: rhs.clone(),
                         });
+                        Arg::Local(index)
                     } else {
                         fn_ctx.ops.push(Op::LocalAssign {
                             index,
                             arg: rhs.clone(),
                         });
+                        rhs
                     }
-                    rhs
+                }
+                Expr::Uniop {
+                    op: Uniop::Deref,
+                    arg: ptr_arg,
+                } => {
+                    let ptr = compile_expr(ptr_arg, fn_ctx, proc_ctx)?;
+                    let ptr_index = fn_ctx.add_tmp_local();
+                    fn_ctx.ops.push(Op::LocalAssign {
+                        index: ptr_index,
+                        arg: ptr,
+                    });
+                    let rhs = compile_expr(&right, fn_ctx, proc_ctx)?;
+                    if let Some(_assign_op) = op.assign_op()? {
+                        // let val_index = fn_ctx.add_tmp_local();
+                        // fn_ctx.ops.push(Op::LocalAssign {
+                        //     index: val_index,
+                        //     arg: rhs.clone(),
+                        // });
+                        // compile_expr(&right, fn_ctx, proc_ctx)?;
+                        // fn_ctx.ops.push(Op::Binop {
+                        //     binop: assign_op,
+                        //     index: val_index,
+                        //     lhs: Arg::Local(val_index),
+                        //     rhs: rhs.clone(),
+                        // });
+                        todo!("deref assign + binop");
+                        // Arg::Local(val_index)
+                    } else {
+                        fn_ctx.ops.push(Op::Store {
+                            index: ptr_index,
+                            arg: rhs.clone(),
+                        });
+                        rhs
+                    }
                 }
                 _ => {
                     return Err(format!(
@@ -130,6 +166,16 @@ fn compile_expr(
                 index,
                 lhs,
                 rhs,
+            });
+            Arg::Local(index)
+        }
+        Expr::Uniop { op, arg } => {
+            let arg = compile_expr(&arg, fn_ctx, proc_ctx)?;
+            let index = fn_ctx.add_tmp_local();
+            fn_ctx.ops.push(Op::Uniop {
+                uniop: op.clone(),
+                index,
+                arg,
             });
             Arg::Local(index)
         }
@@ -180,6 +226,8 @@ fn compile_stmt(
                     let index = fn_ctx.add_local(name.id.clone());
                     fn_ctx.ops.push(Op::LocalAssign { index, arg });
                 }
+            } else {
+                let _ = fn_ctx.add_local(name.id.clone());
             }
         }
         Statement::Return { val } => {

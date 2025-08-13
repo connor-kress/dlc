@@ -1,6 +1,6 @@
 use crate::{
     ir::{Arg, IRFunction, IRProgram, Op},
-    lexer::Binop,
+    lexer::{Binop, Uniop},
 };
 
 #[allow(dead_code)]
@@ -68,6 +68,12 @@ pub fn emit_function<W: std::io::Write>(
                 load_arg(arg, "rax", func, out);
                 let offset = func.slot_offset(*index);
                 writeln!(out, "    movq %rax, {offset}(%rbp)").unwrap();
+            }
+
+            Op::Store { index, arg } => {
+                load_arg(arg, "rax", func, out);
+                load_arg(&Arg::Local(*index), "rdx", func, out);
+                writeln!(out, "    movq %rax, (%rdx)").unwrap();
             }
 
             Op::Binop {
@@ -154,6 +160,17 @@ pub fn emit_function<W: std::io::Write>(
                         unreachable!("assignment ops should already be handled")
                     }
                     _ => todo!("binop op"),
+                }
+                store_reg("rax", *index, func, out);
+            }
+
+            Op::Uniop { uniop, index, arg } => {
+                load_arg(arg, "rax", func, out);
+                match uniop {
+                    Uniop::Deref => {
+                        writeln!(out, "    movq (%rax), %rax").unwrap();
+                    }
+                    _ => todo!("uniop op codegen"),
                 }
                 store_reg("rax", *index, func, out);
             }
