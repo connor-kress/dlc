@@ -31,8 +31,15 @@ impl ProgramContext {
 }
 
 #[derive(Clone, Debug)]
+enum StackItem {
+    Local(String),
+    Temp,
+    Free,
+}
+
+#[derive(Clone, Debug)]
 struct FnContext {
-    pub stack: Vec<Option<String>>,
+    pub stack: Vec<StackItem>,
     pub ops: Vec<Op>,
 }
 
@@ -44,27 +51,57 @@ impl FnContext {
         }
     }
 
+    fn first_free_local(&self) -> Option<usize> {
+        self.stack.iter().position(|s| matches!(s, StackItem::Free))
+    }
+
     fn add_local(&mut self, name: String) -> usize {
-        self.stack.push(Some(name));
-        self.stack.len() - 1
+        if let Some(index) = self.first_free_local() {
+            self.stack[index] = StackItem::Local(name);
+            index
+        } else {
+            self.stack.push(StackItem::Local(name));
+            self.stack.len() - 1
+        }
     }
 
     fn add_tmp_local(&mut self) -> usize {
-        self.stack.push(None);
-        self.stack.len() - 1
+        if let Some(index) = self.first_free_local() {
+            self.stack[index] = StackItem::Temp;
+            index
+        } else {
+            self.stack.push(StackItem::Temp);
+            self.stack.len() - 1
+        }
     }
 
     fn is_tmp_local(&self, index: usize) -> bool {
-        self.stack[index].is_none()
+        matches!(self.stack[index], StackItem::Temp)
     }
 
     fn reassign_local(&mut self, index: usize, name: String) {
-        self.stack[index] = Some(name);
+        self.stack[index] = StackItem::Local(name);
+    }
+
+    fn free_local(&mut self, index: usize) {
+        self.stack[index] = StackItem::Free;
+    }
+
+    fn free_tmp_arg(&mut self, arg: &Arg) {
+        match arg {
+            Arg::Local(index) => {
+                if self.is_tmp_local(*index) {
+                    self.free_local(*index);
+                }
+            }
+            Arg::Deref(arg) => self.free_tmp_arg(arg),
+            _ => {}
+        }
     }
 
     fn get_local(&self, name: &str) -> Option<usize> {
         self.stack.iter().position(|s| {
-            if let Some(s) = s {
+            if let StackItem::Local(s) = s {
                 s == name
             } else {
                 false
@@ -139,12 +176,14 @@ fn compile_expr(
                             lhs: Arg::Local(index),
                             rhs: rhs.clone(),
                         });
+                        fn_ctx.free_tmp_arg(&rhs);
                         Arg::Local(index)
                     } else {
                         fn_ctx.ops.push(Op::LocalAssign {
                             index,
                             arg: rhs.clone(),
                         });
+                        fn_ctx.free_tmp_arg(&rhs);
                         rhs
                     }
                 }
@@ -159,18 +198,19 @@ fn compile_expr(
                         arg: ptr.clone(),
                     });
                     let rhs = compile_expr(&right, fn_ctx, proc_ctx)?;
-                    if let Some(assign_op) = op.assign_op()? {
+                    let res = if let Some(assign_op) = op.assign_op()? {
                         let val_index = fn_ctx.add_tmp_local();
                         fn_ctx.ops.push(Op::Binop {
                             binop: assign_op,
                             index: val_index,
-                            lhs: Arg::Deref(Box::new(ptr)),
+                            lhs: Arg::Deref(Box::new(ptr.clone())),
                             rhs: rhs.clone(),
                         });
                         fn_ctx.ops.push(Op::Store {
                             index: ptr_index,
                             arg: Arg::Local(val_index),
                         });
+                        fn_ctx.free_tmp_arg(&rhs);
                         Arg::Local(val_index)
                     } else {
                         fn_ctx.ops.push(Op::Store {
@@ -178,7 +218,10 @@ fn compile_expr(
                             arg: rhs.clone(),
                         });
                         rhs
-                    }
+                    };
+                    fn_ctx.free_tmp_arg(&ptr);
+                    fn_ctx.free_local(ptr_index);
+                    res
                 }
                 Expr::Index { array, index } => {
                     let index_expr = convert_index_expr_to_deref(
@@ -211,9 +254,11 @@ fn compile_expr(
             fn_ctx.ops.push(Op::Binop {
                 binop: op.clone(),
                 index,
-                lhs,
-                rhs,
+                lhs: lhs.clone(),
+                rhs: rhs.clone(),
             });
+            fn_ctx.free_tmp_arg(&lhs);
+            fn_ctx.free_tmp_arg(&rhs);
             Arg::Local(index)
         }
         Expr::Uniop { op, arg } => {
@@ -222,8 +267,9 @@ fn compile_expr(
             fn_ctx.ops.push(Op::Uniop {
                 uniop: op.clone(),
                 index,
-                arg,
+                arg: arg.clone(),
             });
+            fn_ctx.free_tmp_arg(&arg);
             Arg::Local(index)
         }
         Expr::FuncCall { name, args } => {
@@ -239,8 +285,11 @@ fn compile_expr(
             fn_ctx.ops.push(Op::FuncCall {
                 func: name.id.clone(),
                 ret: index,
-                args: ir_args,
+                args: ir_args.clone(),
             });
+            for arg in ir_args.iter() {
+                fn_ctx.free_tmp_arg(arg);
+            }
             Arg::Local(index)
         }
         Expr::Index { array, index } => {
@@ -262,13 +311,18 @@ fn compile_stmt(
 ) -> Result<(), String> {
     match &stmt.statement {
         Statement::Expr(expr) => {
-            let _ = compile_expr(expr, fn_ctx, proc_ctx)?;
+            let arg = compile_expr(expr, fn_ctx, proc_ctx)?;
+            fn_ctx.free_tmp_arg(&arg);
         }
         Statement::VarDecl { name, val, .. } => {
             match (fn_ctx.get_local(&name.id), val) {
                 (Some(index), Some(val)) => {
                     let arg = compile_expr(val, fn_ctx, proc_ctx)?;
-                    fn_ctx.ops.push(Op::LocalAssign { index, arg });
+                    fn_ctx.ops.push(Op::LocalAssign {
+                        index,
+                        arg: arg.clone(),
+                    });
+                    fn_ctx.free_tmp_arg(&arg);
                 }
                 (Some(_index), None) => {}
                 (None, Some(val)) => {
@@ -282,8 +336,12 @@ fn compile_stmt(
                     }
                     if !assigned_tmp {
                         let index = fn_ctx.add_local(name.id.clone());
-                        fn_ctx.ops.push(Op::LocalAssign { index, arg });
+                        fn_ctx.ops.push(Op::LocalAssign {
+                            index,
+                            arg: arg.clone(),
+                        });
                     }
+                    fn_ctx.free_tmp_arg(&arg);
                 }
                 (None, None) => {
                     let _ = fn_ctx.add_local(name.id.clone());
@@ -293,7 +351,8 @@ fn compile_stmt(
         Statement::Return { val } => {
             if let Some(val) = val {
                 let arg = compile_expr(val, fn_ctx, proc_ctx)?;
-                fn_ctx.ops.push(Op::Return { arg });
+                fn_ctx.ops.push(Op::Return { arg: arg.clone() });
+                fn_ctx.free_tmp_arg(&arg);
             } else {
                 fn_ctx.ops.push(Op::Return {
                     arg: Arg::Literal(0),
@@ -309,8 +368,9 @@ fn compile_stmt(
             let otherwise_label = proc_ctx.new_label("otherwise");
             fn_ctx.ops.push(Op::JumpIfZero {
                 label: otherwise_label.clone(),
-                arg: cond,
+                arg: cond.clone(),
             });
+            fn_ctx.free_tmp_arg(&cond);
             for stmt in if_block.iter() {
                 compile_stmt(&stmt, fn_ctx, proc_ctx)?;
             }
@@ -335,8 +395,9 @@ fn compile_stmt(
             let cond = compile_expr(pred, fn_ctx, proc_ctx)?;
             fn_ctx.ops.push(Op::JumpIfZero {
                 label: after_loop_label.clone(),
-                arg: cond,
+                arg: cond.clone(),
             });
+            fn_ctx.free_tmp_arg(&cond);
             for stmt in body.iter() {
                 compile_stmt(&stmt, fn_ctx, proc_ctx)?;
             }
