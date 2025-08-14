@@ -1,23 +1,25 @@
 use std::fmt::{self, Write};
 
-use crate::lexer::{Binop, Loc, PrimitiveType, Uniop};
-
-pub static INDENT_WIDTH: usize = 4;
+use crate::{
+    ast::{IdWithLoc, Type, TypeWithLoc, INDENT_WIDTH},
+    lexer::{Binop, Loc, Uniop},
+};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct IdWithLoc {
+pub struct TypedId {
     pub id: String,
+    pub ty: Type,
     pub loc: Loc,
 }
 
-impl IdWithLoc {
-    pub fn new(id: String, loc: Loc) -> Self {
-        Self { id, loc }
+impl TypedId {
+    pub fn new(id: String, ty: Type, loc: Loc) -> Self {
+        Self { id, ty, loc }
     }
 }
 
-impl fmt::Display for IdWithLoc {
+impl fmt::Display for TypedId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.id)
     }
@@ -25,85 +27,48 @@ impl fmt::Display for IdWithLoc {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub enum Type {
-    Primitive(PrimitiveType),
-    Id(String),
-    Ptr(Box<TypeWithLoc>),
-}
-
-impl fmt::Display for Type {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Type::Primitive(ty) => write!(f, "{ty:?}"),
-            Type::Id(id) => write!(f, "Id({id})"),
-            Type::Ptr(ty) => write!(f, "Ptr({ty})"),
-        }
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub struct TypeWithLoc {
-    pub type_: Type,
-    pub loc: Loc,
-}
-
-impl TypeWithLoc {
-    pub fn new(type_: Type, loc: Loc) -> Self {
-        Self { type_, loc }
-    }
-}
-
-impl fmt::Display for TypeWithLoc {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.type_)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub enum Expr {
-    Id(IdWithLoc),
+pub enum TypedExprKind {
+    Id(TypedId),
     IntLit(i32),
     FloatLit(f64),
     StrLit(String),
     Uniop {
         op: Uniop,
-        arg: Box<ExprWithLoc>,
+        arg: Box<TypedExpr>,
     },
     Binop {
         op: Binop,
-        left: Box<ExprWithLoc>,
-        right: Box<ExprWithLoc>,
+        left: Box<TypedExpr>,
+        right: Box<TypedExpr>,
     },
     FuncCall {
-        name: Box<ExprWithLoc>,
-        args: Vec<ExprWithLoc>,
+        name: Box<TypedExpr>,
+        args: Vec<TypedExpr>,
     },
     Index {
-        array: Box<ExprWithLoc>,
-        index: Box<ExprWithLoc>,
+        array: Box<TypedExpr>,
+        index: Box<TypedExpr>,
     },
 }
 
-impl Expr {
+impl TypedExprKind {
     pub fn fmt_with_indent(
         &self,
         f: &mut fmt::Formatter,
         _indent: usize,
     ) -> fmt::Result {
         match self {
-            Expr::Id(id) => write!(f, "{id}"),
-            Expr::IntLit(n) => write!(f, "{n}"),
-            Expr::FloatLit(n) => write!(f, "{n}"),
-            Expr::StrLit(s) => write!(f, "{s:?}"),
-            Expr::Uniop { op, arg } => {
+            TypedExprKind::Id(id) => write!(f, "{id}"),
+            TypedExprKind::IntLit(n) => write!(f, "{n}"),
+            TypedExprKind::FloatLit(n) => write!(f, "{n}"),
+            TypedExprKind::StrLit(s) => write!(f, "{s:?}"),
+            TypedExprKind::Uniop { op, arg } => {
                 write!(f, "{op:?}({arg})")
             }
-            Expr::Binop { op, left, right } => {
+            TypedExprKind::Binop { op, left, right } => {
                 write!(f, "{op:?}({left}, {right})")
             }
-            Expr::FuncCall { name, args } => {
+            TypedExprKind::FuncCall { name, args } => {
                 let mut args_str = String::new();
                 for (i, arg) in args.iter().enumerate() {
                     if i != 0 {
@@ -113,14 +78,14 @@ impl Expr {
                 }
                 write!(f, "FuncCall({name}, [{args_str}])")
             }
-            Expr::Index { array, index } => {
+            TypedExprKind::Index { array, index } => {
                 write!(f, "Index({array}, {index})")
             }
         }
     }
 }
 
-impl fmt::Display for Expr {
+impl fmt::Display for TypedExprKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_with_indent(f, 0)
     }
@@ -128,18 +93,19 @@ impl fmt::Display for Expr {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct ExprWithLoc {
-    pub expr: Expr,
+pub struct TypedExpr {
+    pub expr: TypedExprKind,
+    pub ty: Type,
     pub loc: Loc,
 }
 
-impl ExprWithLoc {
-    pub fn new(expr: Expr, loc: Loc) -> Self {
-        Self { expr, loc }
+impl TypedExpr {
+    pub fn new(expr: TypedExprKind, ty: Type, loc: Loc) -> Self {
+        Self { expr, ty, loc }
     }
 }
 
-impl ExprWithLoc {
+impl TypedExpr {
     pub fn fmt_with_indent(
         &self,
         f: &mut fmt::Formatter,
@@ -149,7 +115,7 @@ impl ExprWithLoc {
     }
 }
 
-impl fmt::Display for ExprWithLoc {
+impl fmt::Display for TypedExpr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_with_indent(f, 0)
     }
@@ -158,17 +124,17 @@ impl fmt::Display for ExprWithLoc {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ParamList {
-    pub params: Vec<(IdWithLoc, TypeWithLoc)>,
+    pub params: Vec<TypedId>,
 }
 
 impl fmt::Display for ParamList {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "(")?;
-        for (i, (id, type_)) in self.params.iter().enumerate() {
+        for (i, id) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{name}: {type_}", name = id.id)?;
+            write!(f, "{}: {}", id.id, id.ty)?;
         }
         write!(f, ")")
     }
@@ -176,40 +142,40 @@ impl fmt::Display for ParamList {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub enum Statement {
-    Expr(ExprWithLoc),
-    Block(Vec<Statement>),
+pub enum TypedStatement {
+    Expr(TypedExpr),
+    Block(Vec<TypedStatement>),
     VarDecl {
         name: IdWithLoc,
         type_: Option<TypeWithLoc>,
-        val: Option<Box<ExprWithLoc>>,
+        val: Option<Box<TypedExpr>>,
     },
     If {
-        cond: Box<ExprWithLoc>,
-        if_block: Vec<StatementWithLoc>,
-        else_block: Option<Vec<StatementWithLoc>>,
+        cond: Box<TypedExpr>,
+        if_block: Vec<TypedStatementWithLoc>,
+        else_block: Option<Vec<TypedStatementWithLoc>>,
     },
     Loop {
-        body: Vec<StatementWithLoc>,
+        body: Vec<TypedStatementWithLoc>,
     },
     WhileLoop {
-        pred: Box<ExprWithLoc>,
-        body: Vec<StatementWithLoc>,
+        pred: Box<TypedExpr>,
+        body: Vec<TypedStatementWithLoc>,
     },
     ForLoop {
-        start: Box<ExprWithLoc>,
-        pred: Box<ExprWithLoc>,
-        step: Box<ExprWithLoc>,
-        body: Vec<StatementWithLoc>,
+        start: Box<TypedExpr>,
+        pred: Box<TypedExpr>,
+        step: Box<TypedExpr>,
+        body: Vec<TypedStatementWithLoc>,
     },
     Break,
     Continue,
     Return {
-        val: Option<Box<ExprWithLoc>>,
+        val: Option<Box<TypedExpr>>,
     },
 }
 
-impl Statement {
+impl TypedStatement {
     pub fn fmt_with_indent(
         &self,
         f: &mut fmt::Formatter,
@@ -217,18 +183,18 @@ impl Statement {
     ) -> fmt::Result {
         let i_str = " ".repeat(indent * INDENT_WIDTH);
         match self {
-            Statement::Expr(expr) => {
+            TypedStatement::Expr(expr) => {
                 write!(f, "{i_str}")?;
                 expr.fmt_with_indent(f, indent)?;
             }
-            Statement::Block(statements) => {
+            TypedStatement::Block(statements) => {
                 write!(f, "{i_str}Block:")?;
                 for statement in statements {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
-            Statement::VarDecl { name, type_, val } => {
+            TypedStatement::VarDecl { name, type_, val } => {
                 write!(f, "{i_str}VarDecl({name}")?;
                 if let Some(type_) = type_ {
                     write!(f, ": {type_}")?;
@@ -238,7 +204,7 @@ impl Statement {
                 }
                 write!(f, ")")?;
             }
-            Statement::If {
+            TypedStatement::If {
                 cond,
                 if_block,
                 else_block,
@@ -256,21 +222,21 @@ impl Statement {
                     }
                 }
             }
-            Statement::Loop { body } => {
+            TypedStatement::Loop { body } => {
                 write!(f, "{i_str}Loop:")?;
                 for statement in body {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
-            Statement::WhileLoop { pred, body } => {
+            TypedStatement::WhileLoop { pred, body } => {
                 write!(f, "{i_str}While({pred}):")?;
                 for statement in body {
                     write!(f, "\n")?;
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
-            Statement::ForLoop {
+            TypedStatement::ForLoop {
                 start,
                 pred,
                 step,
@@ -282,9 +248,9 @@ impl Statement {
                     statement.fmt_with_indent(f, indent + 1)?;
                 }
             }
-            Statement::Break => write!(f, "{i_str}Break")?,
-            Statement::Continue => write!(f, "{i_str}Continue")?,
-            Statement::Return { val } => {
+            TypedStatement::Break => write!(f, "{i_str}Break")?,
+            TypedStatement::Continue => write!(f, "{i_str}Continue")?,
+            TypedStatement::Return { val } => {
                 write!(f, "{i_str}Return(")?;
                 if let Some(val) = val {
                     write!(f, "{val})")?;
@@ -297,7 +263,7 @@ impl Statement {
     }
 }
 
-impl fmt::Display for Statement {
+impl fmt::Display for TypedStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_with_indent(f, 0)
     }
@@ -305,18 +271,18 @@ impl fmt::Display for Statement {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct StatementWithLoc {
-    pub statement: Statement,
+pub struct TypedStatementWithLoc {
+    pub statement: TypedStatement,
     pub loc: Loc,
 }
 
-impl StatementWithLoc {
-    pub fn new(statement: Statement, loc: Loc) -> Self {
+impl TypedStatementWithLoc {
+    pub fn new(statement: TypedStatement, loc: Loc) -> Self {
         Self { statement, loc }
     }
 }
 
-impl StatementWithLoc {
+impl TypedStatementWithLoc {
     pub fn fmt_with_indent(
         &self,
         f: &mut fmt::Formatter,
@@ -326,7 +292,7 @@ impl StatementWithLoc {
     }
 }
 
-impl fmt::Display for StatementWithLoc {
+impl fmt::Display for TypedStatementWithLoc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_with_indent(f, 0)
     }
@@ -334,15 +300,15 @@ impl fmt::Display for StatementWithLoc {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub struct Function {
+pub struct TypedFunction {
     pub name: IdWithLoc,
     pub param_list: ParamList,
     pub ret_type: TypeWithLoc,
-    pub body: Vec<StatementWithLoc>,
+    pub body: Vec<TypedStatementWithLoc>,
     pub loc: Loc,
 }
 
-impl Function {
+impl TypedFunction {
     pub fn fmt_with_indent(
         &self,
         f: &mut fmt::Formatter,
@@ -362,7 +328,7 @@ impl Function {
     }
 }
 
-impl fmt::Display for Function {
+impl fmt::Display for TypedFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_with_indent(f, 0)
     }

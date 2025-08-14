@@ -4,6 +4,7 @@ mod compiler;
 mod ir;
 mod lexer;
 mod parser;
+mod typed_ast;
 
 use codegen::emit_program;
 use compiler::compile_program;
