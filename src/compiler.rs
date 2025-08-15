@@ -427,7 +427,7 @@ fn compile_function(
     for stmt in func.body.iter() {
         compile_stmt(&stmt, &mut fn_ctx, proc_ctx)?;
     }
-    println!("stack: {:?}", fn_ctx.stack);
+    // println!("stack: {:?}", fn_ctx.stack);
     let arg_count = func.param_list.params.len();
     let ir_func = IRFunction::new(
         func.name.id.clone(),
@@ -436,7 +436,6 @@ fn compile_function(
         fn_ctx.ops,
         proc_ctx.new_label("exit"),
     );
-    println!("{}", ir_func);
     Ok(ir_func)
 }
 

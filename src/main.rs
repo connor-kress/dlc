@@ -4,6 +4,7 @@ mod compiler;
 mod ir;
 mod lexer;
 mod parser;
+mod type_checker;
 mod typed_ast;
 
 use codegen::emit_program;
@@ -13,6 +14,8 @@ use parser::parse_program;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+
+use crate::type_checker::check_program;
 
 fn assemble_and_link_program(
     asm_filename: &Path,
@@ -176,10 +179,16 @@ fn main() -> Result<(), String> {
     let tokens = tokenize_string(&program_source)?;
     println!("Parsing program...");
     let program = parse_program(tokens)?;
-    println!("{program}");
+    // println!("{program}");
+
+    println!("Type checking program...");
+    let typed_program = check_program(&program)?;
+    // println!("{:#?}", typed_program.functions[0].body[0]);
+    println!("{typed_program}");
 
     println!("Compiling program...");
     let ir_program = compile_program(&program)?;
+    println!("{ir_program}");
 
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
     let input_basename = input_path

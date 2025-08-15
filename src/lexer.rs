@@ -28,7 +28,8 @@ pub enum PrimitiveType {
     Int8,
     Int32,
     Int64,
-    Float,
+    Float32,
+    Float64,
     Bool,
     Void,
 }
@@ -286,12 +287,12 @@ static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
 static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, PrimitiveType>> =
     LazyLock::new(|| {
         HashMap::from([
-            ("int", PrimitiveType::Int32),
             ("int8", PrimitiveType::Int8),
             ("int32", PrimitiveType::Int32),
             ("int64", PrimitiveType::Int64),
             ("char", PrimitiveType::Int8),
-            ("float", PrimitiveType::Float),
+            ("float32", PrimitiveType::Float32),
+            ("float64", PrimitiveType::Float64),
             ("bool", PrimitiveType::Bool),
             ("void", PrimitiveType::Void),
         ])

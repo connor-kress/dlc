@@ -23,7 +23,6 @@ impl fmt::Display for IdWithLoc {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Type {
     Primitive(PrimitiveType),
@@ -41,7 +40,6 @@ impl fmt::Display for Type {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct TypeWithLoc {
     pub type_: Type,
@@ -60,7 +58,6 @@ impl fmt::Display for TypeWithLoc {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Expr {
     Id(IdWithLoc),
@@ -128,7 +125,6 @@ impl fmt::Display for Expr {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ExprWithLoc {
     pub expr: Expr,
@@ -157,7 +153,6 @@ impl fmt::Display for ExprWithLoc {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ParamList {
     pub params: Vec<(IdWithLoc, TypeWithLoc)>,
@@ -180,7 +175,7 @@ impl fmt::Display for ParamList {
 #[derive(Debug, Clone)]
 pub enum Statement {
     Expr(ExprWithLoc),
-    Block(Vec<Statement>),
+    Block(Vec<StatementWithLoc>),
     VarDecl {
         name: IdWithLoc,
         type_: Option<TypeWithLoc>,
@@ -305,7 +300,6 @@ impl fmt::Display for Statement {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct StatementWithLoc {
     pub statement: Statement,
@@ -334,7 +328,6 @@ impl fmt::Display for StatementWithLoc {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Function {
     pub name: IdWithLoc,
@@ -370,6 +363,7 @@ impl fmt::Display for Function {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Program {
     pub functions: Vec<Function>,
 }
