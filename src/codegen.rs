@@ -163,7 +163,7 @@ pub fn emit_function<W: std::io::Write>(
                     | Binop::AssignDiv => {
                         unreachable!("assignment ops should already be handled")
                     }
-                    _ => todo!("binop op"),
+                    _ => todo!("binop codegen: {binop:?}"),
                 }
                 store_reg("rax", *index, func, out);
             }
@@ -174,7 +174,10 @@ pub fn emit_function<W: std::io::Write>(
                     Uniop::Deref => {
                         writeln!(out, "    movq (%rax), %rax").unwrap();
                     }
-                    _ => todo!("uniop op codegen"),
+                    Uniop::Minus => {
+                        writeln!(out, "    neg %rax").unwrap();
+                    }
+                    _ => todo!("uniop codegen: {uniop:?}"),
                 }
                 store_reg("rax", *index, func, out);
             }

@@ -264,13 +264,17 @@ fn compile_expr(
         Expr::Uniop { op, arg } => {
             let arg = compile_expr(&arg, fn_ctx, proc_ctx)?;
             let index = fn_ctx.add_tmp_local();
-            fn_ctx.ops.push(Op::Uniop {
-                uniop: op.clone(),
-                index,
-                arg: arg.clone(),
-            });
-            fn_ctx.free_tmp_arg(&arg);
-            Arg::Local(index)
+            if matches!(op, Uniop::Plus) {
+                arg // noop
+            } else {
+                fn_ctx.ops.push(Op::Uniop {
+                    uniop: op.clone(),
+                    index,
+                    arg: arg.clone(),
+                });
+                fn_ctx.free_tmp_arg(&arg);
+                Arg::Local(index)
+            }
         }
         Expr::FuncCall { name, args } => {
             let mut ir_args = Vec::new();
