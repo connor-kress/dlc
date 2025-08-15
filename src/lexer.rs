@@ -64,6 +64,7 @@ pub enum Token {
     // Literals
     StrLit(String),
     NumLit(String),
+    BoolLit(bool),
 }
 
 #[allow(dead_code)]
@@ -239,6 +240,8 @@ static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
         ("else", Token::Else),
         ("while", Token::While),
         ("return", Token::Return),
+        ("true", Token::BoolLit(true)),
+        ("false", Token::BoolLit(false)),
     ])
 });
 

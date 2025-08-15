@@ -67,6 +67,7 @@ pub enum Expr {
     IntLit(i32),
     FloatLit(f64),
     StrLit(String),
+    BoolLit(bool),
     Uniop {
         op: Uniop,
         arg: Box<ExprWithLoc>,
@@ -97,6 +98,7 @@ impl Expr {
             Expr::IntLit(n) => write!(f, "{n}"),
             Expr::FloatLit(n) => write!(f, "{n}"),
             Expr::StrLit(s) => write!(f, "{s:?}"),
+            Expr::BoolLit(b) => write!(f, "{b}"),
             Expr::Uniop { op, arg } => {
                 write!(f, "{op:?}({arg})")
             }

@@ -32,6 +32,7 @@ pub enum TypedExprKind {
     IntLit(i32),
     FloatLit(f64),
     StrLit(String),
+    BoolLit(bool),
     Uniop {
         op: Uniop,
         arg: Box<TypedExpr>,
@@ -62,6 +63,7 @@ impl TypedExprKind {
             TypedExprKind::IntLit(n) => write!(f, "{n}"),
             TypedExprKind::FloatLit(n) => write!(f, "{n}"),
             TypedExprKind::StrLit(s) => write!(f, "{s:?}"),
+            TypedExprKind::BoolLit(b) => write!(f, "{b}"),
             TypedExprKind::Uniop { op, arg } => {
                 write!(f, "{op:?}({arg})")
             }

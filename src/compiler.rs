@@ -162,6 +162,7 @@ fn compile_expr(
             let index = proc_ctx.add_string_literal(s.clone());
             Arg::DataLabel(format!(".STR{index}"))
         }
+        Expr::BoolLit(b) => Arg::Literal((*b).into()),
         Expr::Binop { op, left, right } if op.is_assignment() => {
             match &left.expr {
                 Expr::Id(id) => {
