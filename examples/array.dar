@@ -1,0 +1,45 @@
+fn print_array(arr: *int64, n: int64) {
+    printf("[");
+    let i = 0;
+    while i < n {
+        if i == 0 {
+            printf("%ld", arr[i]);
+        } else {
+            printf(", %ld", arr[i]);
+        }
+        i += 1;
+    }
+    printf("]\n");
+}
+
+fn gen_array(n: int64) -> *uint64 {
+    let arr = malloc(n * 8);
+    let i = 0;
+    while i < n {
+        arr[i] = i+1;
+        i += 1;
+    }
+    let i = 1;
+    while i < n {
+        arr[i] *= 10;
+        i += 2;
+    }
+    return arr;
+}
+
+fn main() -> int64 {
+    let max_length: int64;
+    printf("Enter a length: ");
+    if scanf("%ld", &max_length) == 0 {
+        printf("Please enter a valid length.\n");
+        return 1;
+    }
+    let n = 1;
+    while n <= max_length {
+        let arr = gen_array(n);
+        print_array(arr, n);
+        free(arr);
+        n += 1;
+    }
+    return 0;
+}

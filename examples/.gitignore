@@ -1,0 +1,6 @@
+# Ignore everything...
+*
+# except the following
+!.gitignore
+!array.dar
+!chat.dar

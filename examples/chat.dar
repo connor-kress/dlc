@@ -1,0 +1,19 @@
+fn main() -> int32 {
+    let name: *char = malloc(100);
+    let age: int32;
+    printf("Enter a name: ");
+    if scanf("%99s", name) == 0 {
+        printf("Error reading input.\n");
+        free(name);
+        return 1;
+    }
+    printf("Enter an age: ");
+    if scanf("%d", &age) == 0 {
+        printf("Error reading input.\n");
+        free(name);
+        return 1;
+    }
+    printf("\n%s is %d years old.\n", name, age);
+    free(name);
+    return 0;
+}
