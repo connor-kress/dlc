@@ -9,6 +9,8 @@ use crate::{
 };
 
 static MAX_PRECEDENCE: usize = 14;
+static FUNCTION_CALL_PRECEDENCE: usize = 1;
+static ARRAY_INDEX_PRECEDENCE: usize = 1;
 
 fn is_right_associative(precedence: usize) -> bool {
     match precedence {
@@ -265,6 +267,9 @@ fn parse_expression_at_precedence(
     while let Some(next) = p.peek_optional_token() {
         match next.token {
             Token::Lparen => {
+                if FUNCTION_CALL_PRECEDENCE > precedence {
+                    break;
+                }
                 let (args, loc) = parse_arg_list(p)?;
                 let loc = Loc::new(acc.loc.start, loc.end);
                 acc = ExprWithLoc::new(
@@ -276,6 +281,9 @@ fn parse_expression_at_precedence(
                 );
             }
             Token::Lbrack => {
+                if ARRAY_INDEX_PRECEDENCE > precedence {
+                    break;
+                }
                 p.advance().unwrap();
                 let expr = parse_expression(p)?;
                 let end = p.expect_token(Token::Rbrack)?.loc.end;
