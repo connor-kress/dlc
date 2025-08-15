@@ -250,6 +250,8 @@ fn compile_expr(
         Expr::Binop { op, left, right } => {
             let lhs = compile_expr(&left, fn_ctx, proc_ctx)?;
             let rhs = compile_expr(&right, fn_ctx, proc_ctx)?;
+            fn_ctx.free_tmp_arg(&lhs);
+            fn_ctx.free_tmp_arg(&rhs);
             let index = fn_ctx.add_tmp_local();
             fn_ctx.ops.push(Op::Binop {
                 binop: op.clone(),
@@ -257,8 +259,6 @@ fn compile_expr(
                 lhs: lhs.clone(),
                 rhs: rhs.clone(),
             });
-            fn_ctx.free_tmp_arg(&lhs);
-            fn_ctx.free_tmp_arg(&rhs);
             Arg::Local(index)
         }
         Expr::Uniop { op, arg } => {
@@ -267,12 +267,12 @@ fn compile_expr(
             if matches!(op, Uniop::Plus) {
                 arg // noop
             } else {
+                fn_ctx.free_tmp_arg(&arg);
                 fn_ctx.ops.push(Op::Uniop {
                     uniop: op.clone(),
                     index,
                     arg: arg.clone(),
                 });
-                fn_ctx.free_tmp_arg(&arg);
                 Arg::Local(index)
             }
         }
