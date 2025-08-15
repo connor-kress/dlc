@@ -433,6 +433,7 @@ fn compile_function(
         arg_count,
         fn_ctx.stack.len() - arg_count, // local_count
         fn_ctx.ops,
+        proc_ctx.new_label("exit"),
     );
     println!("{}", ir_func);
     Ok(ir_func)

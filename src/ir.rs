@@ -120,6 +120,7 @@ pub struct IRFunction {
     pub local_count: usize,
     pub stack_size: usize,
     pub body: Vec<Op>,
+    pub exit_label: String,
 }
 
 impl IRFunction {
@@ -128,6 +129,7 @@ impl IRFunction {
         arg_count: usize,
         local_count: usize,
         body: Vec<Op>,
+        exit_label: String,
     ) -> Self {
         let mut stack_size = (arg_count + local_count) * 8;
         if stack_size % 16 != 0 {
@@ -139,6 +141,7 @@ impl IRFunction {
             local_count,
             stack_size,
             body,
+            exit_label,
         }
     }
 

@@ -193,8 +193,9 @@ pub fn emit_function<W: std::io::Write>(
 
             Op::Return { arg } => {
                 load_arg(arg, "rax", func, out);
-                // TODO: early returns
-                assert_eq!(i, func.body.len() - 1);
+                if i != func.body.len() - 1 {
+                    writeln!(out, "    jmp {}", func.exit_label).unwrap();
+                }
             }
 
             Op::FuncCall {
@@ -238,6 +239,7 @@ pub fn emit_function<W: std::io::Write>(
         }
     }
 
+    writeln!(out, "    {}:", func.exit_label).unwrap();
     if should_save_stack {
         writeln!(out, "    movq %rbp, %rsp").unwrap();
     }
