@@ -66,6 +66,7 @@ pub fn emit_function<W: std::io::Write>(
     for i in 0..func.arg_count {
         store_reg(ARG_REGISTERS[i], i, func, out);
     }
+    let mut used_exit_label = false;
     for (i, op) in func.body.iter().enumerate() {
         match op {
             Op::LocalAssign { index, arg } => {
@@ -194,6 +195,7 @@ pub fn emit_function<W: std::io::Write>(
             Op::Return { arg } => {
                 load_arg(arg, "rax", func, out);
                 if i != func.body.len() - 1 {
+                    used_exit_label = true;
                     writeln!(out, "    jmp {}", func.exit_label).unwrap();
                 }
             }
@@ -239,7 +241,9 @@ pub fn emit_function<W: std::io::Write>(
         }
     }
 
-    writeln!(out, "    {}:", func.exit_label).unwrap();
+    if used_exit_label {
+        writeln!(out, "    {}:", func.exit_label).unwrap();
+    }
     if should_save_stack {
         writeln!(out, "    movq %rbp, %rsp").unwrap();
     }
