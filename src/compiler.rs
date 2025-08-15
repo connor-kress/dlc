@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Expr, ExprWithLoc, Function, Statement, StatementWithLoc},
+    ast::{Expr, ExprWithLoc, Function, Program, Statement, StatementWithLoc},
     ir::{Arg, IRFunction, IRProgram, Op},
     lexer::{Binop, Loc, Uniop},
 };
@@ -440,10 +440,10 @@ fn compile_function(
     Ok(ir_func)
 }
 
-pub fn compile_program(funcs: &Vec<Function>) -> Result<IRProgram, String> {
+pub fn compile_program(program: &Program) -> Result<IRProgram, String> {
     let mut proc_ctx = ProgramContext::new();
     let mut ir_funcs = Vec::new();
-    for func in funcs.iter() {
+    for func in program.functions.iter() {
         let ir_func = compile_function(func, &mut proc_ctx)?;
         ir_funcs.push(ir_func);
     }

@@ -335,3 +335,16 @@ impl fmt::Display for TypedFunction {
         self.fmt_with_indent(f, 0)
     }
 }
+
+pub struct TypedProgram {
+    pub functions: Vec<TypedFunction>,
+}
+
+impl fmt::Display for TypedProgram {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for function in &self.functions {
+            write!(f, "{function}\n\n")?;
+        }
+        Ok(())
+    }
+}

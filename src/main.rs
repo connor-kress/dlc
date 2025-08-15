@@ -175,14 +175,11 @@ fn main() -> Result<(), String> {
     };
     let tokens = tokenize_string(&program_source)?;
     println!("Parsing program...");
-    let functions = parse_program(tokens)?;
-    for function in functions.iter() {
-        println!("{}", function);
-        println!();
-    }
+    let program = parse_program(tokens)?;
+    println!("{program}");
 
     println!("Compiling program...");
-    let program = compile_program(&functions)?;
+    let ir_program = compile_program(&program)?;
 
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
     let input_basename = input_path
@@ -194,7 +191,7 @@ fn main() -> Result<(), String> {
     let obj_filename = parent_dir.join(format!("{}.o", input_basename));
     let mut file = File::create(&asm_filename)
         .map_err(|e| format!("Failed to create file: {}", e))?;
-    emit_program(&program, &mut file)?;
+    emit_program(&ir_program, &mut file)?;
 
     assemble_and_link_program(&asm_filename, &obj_filename, &cli.output_path)?;
 
