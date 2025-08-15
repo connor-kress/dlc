@@ -174,9 +174,18 @@ pub fn emit_function<W: std::io::Write>(
                     Uniop::Deref => {
                         writeln!(out, "    movq (%rax), %rax").unwrap();
                     }
-                    Uniop::Minus => {
-                        writeln!(out, "    neg %rax").unwrap();
-                    }
+                    Uniop::Ref => match arg {
+                        Arg::Local(i) => {
+                            let offset = func.slot_offset(*i);
+                            writeln!(out, "    leaq {}(%rbp), %rax", offset)
+                                .unwrap();
+                        }
+                        _ => {
+                            return Err(format!(
+                                "`&` not supported for arg type: {arg:?}"
+                            ));
+                        }
+                    },
                     _ => todo!("uniop codegen: {uniop:?}"),
                 }
                 store_reg("rax", *index, func, out);
