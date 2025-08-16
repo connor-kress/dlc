@@ -36,3 +36,9 @@ impl fmt::Display for Type {
         }
     }
 }
+
+impl Type {
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Type::Primitive(PrimitiveType::Bool))
+    }
+}

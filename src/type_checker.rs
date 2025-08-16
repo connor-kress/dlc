@@ -48,8 +48,8 @@ impl TypeCheckerContext {
         Ok(ctx)
     }
 
-    fn get_func_type(&self, name: &str) -> Option<&FuncType> {
-        self.functions.get(name)
+    fn get_func_type(&self, name: &str) -> Option<FuncType> {
+        self.functions.get(name).cloned()
     }
 }
 
@@ -96,16 +96,16 @@ fn find_type_of_id(
     if let Some(ty) = ctx.func.get_local(&id.id) {
         Ok(ty.clone())
     } else if let Some(func_type) = ctx.get_func_type(&id.id) {
-        Ok(Type::Func(func_type.clone()))
+        Ok(Type::Func(func_type))
     } else {
         println!("{ctx:#?}");
         Err(format!("Undefined local variable `{id}`"))
     }
 }
 
-fn is_valid_arithmetic_type(ty: &Type) -> bool {
+fn are_arithmetic_compatible_types(lhs: &Type, _rhs: &Type) -> bool {
     matches!(
-        ty,
+        lhs,
         Type::Primitive(
             PrimitiveType::Int8
                 | PrimitiveType::Int16
@@ -122,29 +122,37 @@ fn get_binop_type(
     left: &Type,
     right: &Type,
 ) -> Result<Type, String> {
+    let get_error_msg = || {
+        format!("Invalid types for operator `{op:?}`: `{left}` and `{right}`")
+    };
     if left != right {
-        return Err(format!(
-            "Invalid types for operator `{op:?}`: `{left}` and `{right}`"
-        ));
+        return Err(get_error_msg());
     }
+    use Binop as B;
     Ok(match op {
-        Binop::Add | Binop::Sub | Binop::Mul | Binop::Div => {
-            if !is_valid_arithmetic_type(left) {
+        B::Add | B::Sub | B::Mul | B::Div => {
+            if !are_arithmetic_compatible_types(left, right) {
                 return Err(format!(
                     "Invalid types for operation `{op:?}`: `{left}` and `{right}`"
                 ));
             }
             left.clone()
         }
-        Binop::Eq => Type::Primitive(PrimitiveType::Bool),
-        Binop::Neq => Type::Primitive(PrimitiveType::Bool),
-        Binop::Lt => Type::Primitive(PrimitiveType::Bool),
-        Binop::Le => Type::Primitive(PrimitiveType::Bool),
-        Binop::Gt => Type::Primitive(PrimitiveType::Bool),
-        Binop::Ge => Type::Primitive(PrimitiveType::Bool),
-        Binop::Land => Type::Primitive(PrimitiveType::Bool),
-        Binop::Lor => Type::Primitive(PrimitiveType::Bool),
-        _ => return Err(format!("Invalid binary operation `{op:?}`")),
+        B::Eq | B::Neq => {
+            // TODO: Check if types are equatable
+            Type::Primitive(PrimitiveType::Bool)
+        }
+        B::Lt | B::Le | B::Gt | B::Ge => {
+            // TODO: Check if types are ordinal
+            Type::Primitive(PrimitiveType::Bool)
+        }
+        B::Land | B::Lor => {
+            if !left.is_bool() || !right.is_bool() {
+                return Err(get_error_msg());
+            }
+            Type::Primitive(PrimitiveType::Bool)
+        }
+        _ => todo!("type checking for binary operator `{op:?}`"),
     })
 }
 
@@ -209,10 +217,30 @@ fn check_expr(
         }
 
         Expr::FuncCall { name, args } => {
+            let Expr::Id(id) = &name.expr else {
+                return Err(format!("Invalid function name: `{}`", name.expr));
+            };
+            let Some(func_type) = ctx.get_func_type(&id.id) else {
+                return Err(format!("Undefined function `{}`", id.id));
+            };
+            if func_type.params.len() != args.len() {
+                return Err(format!(
+                    "Invalid number of arguments for function `{}`: {} expected, {} provided",
+                    id.id, func_type.params.len(), args.len()
+                ));
+            }
             let mut typed_args = Vec::new();
             for arg in args {
                 let typed_arg = check_expr(&arg, ctx)?;
                 typed_args.push(typed_arg);
+            }
+            for (param, arg) in func_type.params.iter().zip(typed_args.iter()) {
+                if param.1 != arg.ty {
+                    return Err(format!(
+                        "Invalid argument type for function `{}`: expected `{}`, got `{}`",
+                        id.id, param.1, arg.ty
+                    ));
+                }
             }
             TypedExpr {
                 expr: TypedExprKind::FuncCall {
@@ -256,14 +284,29 @@ fn check_statement(
                 Some(val) => Some(Box::new(check_expr(&val, ctx)?)),
                 None => None,
             };
-            if let Some(ref val) = typed_val {
-                let ty = val.ty.clone();
-                ctx.func.add_local(name.id.clone(), ty);
-            } else if let Some(type_) = type_ {
-                let ty = convert_ast_type(type_, ctx)?;
-                ctx.func.add_local(name.id.clone(), ty);
-            } else {
-                todo!("Multi-statement type inference");
+            match (&typed_val, type_) {
+                (Some(val), Some(type_)) => {
+                    let val_ty = val.ty.clone();
+                    let type_ty = convert_ast_type(type_, ctx)?;
+                    if val_ty != type_ty {
+                        return Err(format!(
+                            "Invalid type for variable `{}`: expected `{}`, got `{}`",
+                            name.id, type_ty, val_ty
+                        ));
+                    }
+                    ctx.func.add_local(name.id.clone(), type_ty);
+                }
+                (Some(val), None) => {
+                    let ty = val.ty.clone();
+                    ctx.func.add_local(name.id.clone(), ty);
+                }
+                (None, Some(type_)) => {
+                    let ty = convert_ast_type(type_, ctx)?;
+                    ctx.func.add_local(name.id.clone(), ty);
+                }
+                (None, None) => {
+                    todo!("Multi-statement type inference");
+                }
             }
             TypedStatementKind::VarDecl {
                 name: name.clone(),
