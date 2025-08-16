@@ -1,8 +1,9 @@
 use std::fmt::{self, Write};
 
 use crate::{
-    ast::{IdWithLoc, ParamList, Type, TypeWithLoc, INDENT_WIDTH},
+    ast::{IdWithLoc, ParamList, TypeWithLoc, INDENT_WIDTH},
     lexer::{Binop, Loc, Uniop},
+    types::Type,
 };
 
 #[derive(Debug, Clone)]

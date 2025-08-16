@@ -6,6 +6,7 @@ mod lexer;
 mod parser;
 mod type_checker;
 mod typed_ast;
+mod types;
 
 use codegen::emit_program;
 use compiler::compile_program;

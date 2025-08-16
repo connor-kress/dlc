@@ -2,28 +2,54 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        Expr, ExprWithLoc, Function, Program, Statement, StatementWithLoc,
-        Type, TypeWithLoc,
+        Expr, ExprWithLoc, Function, IdWithLoc, Program, Statement,
+        StatementWithLoc, Type as AstType, TypeWithLoc,
     },
     lexer::{Binop, PrimitiveType},
     typed_ast::{
         TypedExpr, TypedExprKind, TypedFunction, TypedProgram, TypedStatement,
         TypedStatementKind,
     },
+    types::{FuncType, Type},
 };
 
 #[derive(Clone, Debug)]
-struct TypeCheckerContext<'a> {
-    program: &'a Program,
+struct TypeCheckerContext {
+    functions: HashMap<String, FuncType>,
     func: TypeCheckerFunctionContext,
 }
 
-impl<'a> TypeCheckerContext<'a> {
-    fn new(program: &'a Program) -> Self {
-        Self {
-            program,
+impl TypeCheckerContext {
+    fn new(program: &Program) -> Result<Self, String> {
+        // Structs will be handled before here so they will be
+        // available for function headers
+        let mut ctx = Self {
+            functions: HashMap::new(),
             func: TypeCheckerFunctionContext::new(),
+        };
+        let mut functions = HashMap::new();
+        for function in &program.functions {
+            println!("Parsing function: {}", function.name.id);
+            let mut params = Vec::new();
+            for (id, type_) in &function.param_list.params {
+                params
+                    .push((id.id.clone(), convert_ast_type(&type_, &mut ctx)?));
+            }
+            let func_type = FuncType {
+                params,
+                ret_type: Box::new(convert_ast_type(
+                    &function.ret_type,
+                    &mut ctx,
+                )?),
+            };
+            functions.insert(function.name.id.clone(), func_type);
         }
+        ctx.functions = functions;
+        Ok(ctx)
+    }
+
+    fn get_func_type(&self, name: &str) -> Option<&FuncType> {
+        self.functions.get(name)
     }
 }
 
@@ -49,6 +75,31 @@ impl<'a> TypeCheckerFunctionContext {
 
     fn clear(&mut self) {
         self.locals.clear();
+    }
+}
+
+fn convert_ast_type(
+    ty: &TypeWithLoc,
+    ctx: &mut TypeCheckerContext,
+) -> Result<Type, String> {
+    Ok(match &ty.type_ {
+        AstType::Primitive(ty) => Type::Primitive(*ty),
+        AstType::Id(_id) => todo!("Custom types are not yet implemented"),
+        AstType::Ptr(ty) => Type::Ptr(Box::new(convert_ast_type(ty, ctx)?)),
+    })
+}
+
+fn find_type_of_id(
+    id: &IdWithLoc,
+    ctx: &mut TypeCheckerContext,
+) -> Result<Type, String> {
+    if let Some(ty) = ctx.func.get_local(&id.id) {
+        Ok(ty.clone())
+    } else if let Some(func_type) = ctx.get_func_type(&id.id) {
+        Ok(Type::Func(func_type.clone()))
+    } else {
+        println!("{ctx:#?}");
+        Err(format!("Undefined local variable `{id}`"))
     }
 }
 
@@ -104,35 +155,34 @@ fn check_expr(
     Ok(match &expr.expr {
         Expr::Id(id) => TypedExpr {
             expr: TypedExprKind::Id(id.id.clone()),
-            ty: ctx
-                .func
-                .get_local(&id.id)
-                .ok_or_else(|| format!("Undefined local variable `{id}`"))?,
+            ty: find_type_of_id(&id, ctx)?,
             loc: expr.loc.clone(),
         },
+
         Expr::IntLit(n) => TypedExpr {
             expr: TypedExprKind::IntLit(*n),
             ty: Type::Primitive(PrimitiveType::Int64), // TODO
             loc: expr.loc.clone(),
         },
+
         Expr::FloatLit(n) => TypedExpr {
             expr: TypedExprKind::FloatLit(*n),
             ty: Type::Primitive(PrimitiveType::Float64), // TODO
             loc: expr.loc.clone(),
         },
+
         Expr::StrLit(s) => TypedExpr {
             expr: TypedExprKind::StrLit(s.clone()),
-            ty: Type::Ptr(Box::new(TypeWithLoc::new(
-                Type::Primitive(PrimitiveType::Int8),
-                expr.loc.clone(), // TODO: this shouldn't have a loc?
-            ))),
+            ty: Type::Ptr(Box::new(Type::Primitive(PrimitiveType::Int8))),
             loc: expr.loc.clone(),
         },
+
         Expr::BoolLit(b) => TypedExpr {
             expr: TypedExprKind::BoolLit(*b),
             ty: Type::Primitive(PrimitiveType::Bool),
             loc: expr.loc.clone(),
         },
+
         Expr::Uniop { op, arg } => TypedExpr {
             expr: TypedExprKind::Uniop {
                 op: op.clone(),
@@ -141,6 +191,7 @@ fn check_expr(
             ty: Type::Primitive(PrimitiveType::Void), // TODO
             loc: expr.loc.clone(),
         },
+
         Expr::Binop { op, left, right } => {
             let left_typed = check_expr(&left, ctx)?;
             let right_typed = check_expr(&right, ctx)?;
@@ -156,6 +207,7 @@ fn check_expr(
                 loc: expr.loc.clone(),
             }
         }
+
         Expr::FuncCall { name, args } => {
             let mut typed_args = Vec::new();
             for arg in args {
@@ -171,6 +223,7 @@ fn check_expr(
                 loc: expr.loc.clone(),
             }
         }
+
         Expr::Index { array, index } => TypedExpr {
             expr: TypedExprKind::Index {
                 array: Box::new(check_expr(&array, ctx)?),
@@ -207,7 +260,8 @@ fn check_statement(
                 let ty = val.ty.clone();
                 ctx.func.add_local(name.id.clone(), ty);
             } else if let Some(type_) = type_ {
-                ctx.func.add_local(name.id.clone(), type_.type_.clone());
+                let ty = convert_ast_type(type_, ctx)?;
+                ctx.func.add_local(name.id.clone(), ty);
             } else {
                 todo!("Multi-statement type inference");
             }
@@ -289,7 +343,8 @@ fn check_function(
     ctx: &mut TypeCheckerContext,
 ) -> Result<TypedFunction, String> {
     for (param, type_) in &function.param_list.params {
-        ctx.func.add_local(param.id.clone(), type_.type_.clone());
+        let ty = convert_ast_type(&type_, ctx)?;
+        ctx.func.add_local(param.id.clone(), ty);
     }
     let mut typed_statements = Vec::new();
     for statement in &function.body {
@@ -306,7 +361,7 @@ fn check_function(
 }
 
 pub fn check_program(program: &Program) -> Result<TypedProgram, String> {
-    let mut ctx = TypeCheckerContext::new(&program);
+    let mut ctx = TypeCheckerContext::new(&program)?;
     let mut typed_functions = Vec::new();
     for function in &program.functions {
         ctx.func.clear();
