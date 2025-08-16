@@ -266,14 +266,31 @@ fn check_expr(
             }
         }
 
-        Expr::Index { array, index } => TypedExpr {
-            expr: TypedExprKind::Index {
-                array: Box::new(check_expr(&array, ctx)?),
-                index: Box::new(check_expr(&index, ctx)?),
-            },
-            ty: Type::Primitive(PrimitiveType::Void), // TODO
-            loc: expr.loc.clone(),
-        },
+        Expr::Index { array, index } => {
+            let array = check_expr(&array, ctx)?;
+            let index = check_expr(&index, ctx)?;
+            let Type::Ptr(item_ty) = &array.ty else {
+                return Err(format!(
+                    "Invalid type for array indexing: `{}`",
+                    array.ty
+                ));
+            };
+            let item_ty = *item_ty.clone();
+            if !matches!(index.ty, Type::Primitive(PrimitiveType::Int64)) {
+                return Err(format!(
+                    "Invalid type for array index: `{}`",
+                    index.ty
+                ));
+            }
+            TypedExpr {
+                expr: TypedExprKind::Index {
+                    array: Box::new(array),
+                    index: Box::new(index),
+                },
+                ty: item_ty,
+                loc: expr.loc.clone(),
+            }
+        }
     })
 }
 
