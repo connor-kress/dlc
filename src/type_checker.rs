@@ -5,7 +5,7 @@ use crate::{
         Expr, ExprWithLoc, Function, IdWithLoc, Program, Statement,
         StatementWithLoc, Type as AstType, TypeWithLoc,
     },
-    lexer::{Binop, PrimitiveType},
+    lexer::{Binop, Primative},
     typed_ast::{
         TypedExpr, TypedExprKind, TypedFunction, TypedProgram, TypedStatement,
         TypedStatementKind,
@@ -124,17 +124,10 @@ fn find_type_of_id(
 }
 
 fn are_arithmetic_compatible_types(lhs: &Type, _rhs: &Type) -> bool {
-    matches!(
-        lhs,
-        Type::Primitive(
-            PrimitiveType::Int8
-                | PrimitiveType::Int16
-                | PrimitiveType::Int32
-                | PrimitiveType::Int64
-                | PrimitiveType::Float32
-                | PrimitiveType::Float64
-        )
-    )
+    let Type::Primitive(lhs) = lhs else {
+        return false;
+    };
+    lhs.is_int() || lhs.is_float()
 }
 
 fn get_binop_type(
@@ -160,17 +153,17 @@ fn get_binop_type(
         }
         B::Eq | B::Neq => {
             // TODO: Check if types are equatable
-            Type::Primitive(PrimitiveType::Bool)
+            Type::Primitive(Primative::Bool)
         }
         B::Lt | B::Le | B::Gt | B::Ge => {
             // TODO: Check if types are ordinal
-            Type::Primitive(PrimitiveType::Bool)
+            Type::Primitive(Primative::Bool)
         }
         B::Land | B::Lor => {
             if !left.is_bool() || !right.is_bool() {
                 return Err(get_error_msg());
             }
-            Type::Primitive(PrimitiveType::Bool)
+            Type::Primitive(Primative::Bool)
         }
         B::Assign => {
             if left != right {
@@ -201,27 +194,27 @@ fn check_expr(
             loc: expr.loc.clone(),
         },
 
-        Expr::IntLit(n) => TypedExpr {
+        Expr::IntLit(n, hint) => TypedExpr {
             expr: TypedExprKind::IntLit(*n),
-            ty: Type::Primitive(PrimitiveType::Int64), // TODO
+            ty: Type::Primitive(hint.unwrap_or(Primative::Int64)),
             loc: expr.loc.clone(),
         },
 
-        Expr::FloatLit(n) => TypedExpr {
+        Expr::FloatLit(n, hint) => TypedExpr {
             expr: TypedExprKind::FloatLit(*n),
-            ty: Type::Primitive(PrimitiveType::Float64), // TODO
+            ty: Type::Primitive(hint.unwrap_or(Primative::Float64)),
             loc: expr.loc.clone(),
         },
 
         Expr::StrLit(s) => TypedExpr {
             expr: TypedExprKind::StrLit(s.clone()),
-            ty: Type::Ptr(Box::new(Type::Primitive(PrimitiveType::Int8))),
+            ty: Type::Ptr(Box::new(Type::Primitive(Primative::Int8))),
             loc: expr.loc.clone(),
         },
 
         Expr::BoolLit(b) => TypedExpr {
             expr: TypedExprKind::BoolLit(*b),
-            ty: Type::Primitive(PrimitiveType::Bool),
+            ty: Type::Primitive(Primative::Bool),
             loc: expr.loc.clone(),
         },
 
@@ -230,7 +223,7 @@ fn check_expr(
                 op: op.clone(),
                 arg: Box::new(check_expr(&arg, ctx)?),
             },
-            ty: Type::Primitive(PrimitiveType::Void), // TODO
+            ty: Type::Primitive(Primative::Void), // TODO
             loc: expr.loc.clone(),
         },
 
@@ -296,7 +289,7 @@ fn check_expr(
                 ));
             };
             let item_ty = *item_ty.clone();
-            if !matches!(index.ty, Type::Primitive(PrimitiveType::Int64)) {
+            if !matches!(index.ty, Type::Primitive(Primative::Int64)) {
                 return Err(format!(
                     "Invalid type for array index: `{}`",
                     index.ty

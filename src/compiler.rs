@@ -1,7 +1,7 @@
 use crate::{
     ast::{Expr, ExprWithLoc, Function, Program, Statement, StatementWithLoc},
     ir::{Arg, IRFunction, IRProgram, Op},
-    lexer::{Binop, Loc, Uniop},
+    lexer::{Binop, Loc, Primative, Uniop},
 };
 
 #[derive(Clone, Debug)]
@@ -120,7 +120,7 @@ fn convert_index_expr_to_deref(
             op: Binop::Mul,
             left: Box::new(index.clone()),
             right: Box::new(ExprWithLoc::new(
-                Expr::IntLit(8),
+                Expr::IntLit(8, Some(Primative::Int64)),
                 index.loc.clone(),
             )),
         },
@@ -157,7 +157,7 @@ fn compile_expr(
             })?;
             Arg::Local(index)
         }
-        Expr::IntLit(val) => Arg::Literal((*val).into()),
+        Expr::IntLit(val, _) => Arg::Literal((*val).into()),
         Expr::StrLit(s) => {
             let index = proc_ctx.add_string_literal(s.clone());
             Arg::DataLabel(format!(".STR{index}"))

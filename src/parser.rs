@@ -5,7 +5,9 @@ use crate::{
         Expr, ExprWithLoc, Function, IdWithLoc, ParamList, Program, Statement,
         StatementWithLoc, Type, TypeWithLoc,
     },
-    lexer::{Binop, Loc, PrimitiveType, Token, TokenWithLoc, Uniop},
+    lexer::{
+        Binop, Loc, Primative, Token, TokenWithLoc, Uniop, PRIMITIVE_TYPES,
+    },
 };
 
 static MAX_PRECEDENCE: usize = 14;
@@ -155,16 +157,42 @@ impl Parser {
 }
 
 fn parse_numeric_literal(num_str: &str) -> Result<Expr, String> {
-    if num_str.contains('.') {
-        let num = num_str
+    let mut hint = None;
+    let mut trimmed_num_str = num_str;
+    let mut hint_is_float = false;
+    if num_str.len() >= 3 {
+        for (key, prim) in PRIMITIVE_TYPES.iter() {
+            if num_str.ends_with(*key) {
+                if prim.is_float() {
+                    hint_is_float = true;
+                } else if !prim.is_int() {
+                    return Err(format!(
+                        "Invalid numeric literal: `{num_str}` with hint `{hint:?}`"
+                    ));
+                }
+                hint = Some(*prim);
+                trimmed_num_str = &num_str[..num_str.len() - key.len()];
+                break;
+            }
+        }
+    }
+    if num_str.contains('.') || hint_is_float {
+        let num = trimmed_num_str
             .parse::<f64>()
             .map_err(|_| format!("Invalid float literal: {}", num_str))?;
-        Ok(Expr::FloatLit(num))
+        if let Some(hint) = hint {
+            if !hint.is_float() {
+                return Err(format!(
+                    "Invalid float literal: `{num_str}` with hint `{hint:?}`"
+                ));
+            }
+        }
+        Ok(Expr::FloatLit(num, hint))
     } else {
-        let num = num_str
-            .parse::<i32>()
+        let num = trimmed_num_str
+            .parse::<i64>()
             .map_err(|_| format!("Invalid integer literal: {}", num_str))?;
-        Ok(Expr::IntLit(num))
+        Ok(Expr::IntLit(num, hint))
     }
 }
 
@@ -499,10 +527,7 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
             p.advance().unwrap();
             parse_type(p)?
         }
-        _ => TypeWithLoc::new(
-            Type::Primitive(PrimitiveType::Void),
-            empty_type_loc,
-        ),
+        _ => TypeWithLoc::new(Type::Primitive(Primative::Void), empty_type_loc),
     };
     let (body, body_loc) = parse_block(p)?;
     let fn_end = body_loc.end;

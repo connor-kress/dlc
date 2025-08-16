@@ -9,7 +9,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum TypedExprKind {
     Id(String),
-    IntLit(i32),
+    IntLit(i64),
     FloatLit(f64),
     StrLit(String),
     BoolLit(bool),

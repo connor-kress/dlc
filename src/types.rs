@@ -1,4 +1,4 @@
-use crate::lexer::PrimitiveType;
+use crate::lexer::Primative;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -22,7 +22,7 @@ impl fmt::Display for FuncType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
-    Primitive(PrimitiveType),
+    Primitive(Primative),
     Func(FuncType),
     Ptr(Box<Type>),
 }
@@ -39,9 +39,9 @@ impl fmt::Display for Type {
 
 impl Type {
     pub fn is_bool(&self) -> bool {
-        matches!(self, Type::Primitive(PrimitiveType::Bool))
+        matches!(self, Type::Primitive(Primative::Bool))
     }
     pub fn is_void(&self) -> bool {
-        matches!(self, Type::Primitive(PrimitiveType::Void))
+        matches!(self, Type::Primitive(Primative::Void))
     }
 }

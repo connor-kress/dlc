@@ -25,7 +25,7 @@ impl Loc {
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum PrimitiveType {
+pub enum Primative {
     Int8,
     Int16,
     Int32,
@@ -34,6 +34,18 @@ pub enum PrimitiveType {
     Float64,
     Bool,
     Void,
+}
+
+impl Primative {
+    pub fn is_int(&self) -> bool {
+        use Primative as P;
+        matches!(self, P::Int8 | P::Int16 | P::Int32 | P::Int64)
+    }
+
+    pub fn is_float(&self) -> bool {
+        use Primative as P;
+        matches!(self, P::Float32 | P::Float64)
+    }
 }
 
 #[allow(dead_code)]
@@ -50,7 +62,7 @@ pub enum Token {
     Semi,
     ThinArrow,
 
-    Type(PrimitiveType),
+    Type(Primative),
     Binop(Binop),
     Uniop(Uniop),
     Id(String),
@@ -103,8 +115,7 @@ pub enum Binop {
     Land,
     BitOr,
     BitAnd,
-    BitXor,
-    // In, // for iters
+    BitXor, // In, // for iters
 }
 
 impl Binop {
@@ -286,17 +297,18 @@ static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
         ])
     });
 
-static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, PrimitiveType>> =
+pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
     LazyLock::new(|| {
         HashMap::from([
-            ("int8", PrimitiveType::Int8),
-            ("int32", PrimitiveType::Int32),
-            ("int64", PrimitiveType::Int64),
-            ("char", PrimitiveType::Int8),
-            ("float32", PrimitiveType::Float32),
-            ("float64", PrimitiveType::Float64),
-            ("bool", PrimitiveType::Bool),
-            ("void", PrimitiveType::Void),
+            ("i8", Primative::Int8),
+            ("i16", Primative::Int16),
+            ("i32", Primative::Int32),
+            ("i64", Primative::Int64),
+            ("char", Primative::Int8),
+            ("f32", Primative::Float32),
+            ("f64", Primative::Float64),
+            ("bool", Primative::Bool),
+            ("void", Primative::Void),
         ])
     });
 

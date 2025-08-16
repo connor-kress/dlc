@@ -1,6 +1,6 @@
 use std::fmt::{self, Write};
 
-use crate::lexer::{Binop, Loc, PrimitiveType, Uniop};
+use crate::lexer::{Binop, Loc, Primative, Uniop};
 
 pub static INDENT_WIDTH: usize = 4;
 
@@ -25,20 +25,9 @@ impl fmt::Display for IdWithLoc {
 
 #[derive(Debug, Clone)]
 pub enum Type {
-    Primitive(PrimitiveType),
+    Primitive(Primative),
     Id(String),
     Ptr(Box<TypeWithLoc>),
-}
-
-impl PartialEq for Type {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Type::Primitive(ty1), Type::Primitive(ty2)) => ty1 == ty2,
-            (Type::Id(id1), Type::Id(id2)) => id1 == id2,
-            (Type::Ptr(ty1), Type::Ptr(ty2)) => ty1.type_ == ty2.type_,
-            _ => false,
-        }
-    }
 }
 
 impl fmt::Display for Type {
@@ -72,8 +61,8 @@ impl fmt::Display for TypeWithLoc {
 #[derive(Debug, Clone)]
 pub enum Expr {
     Id(IdWithLoc),
-    IntLit(i32),
-    FloatLit(f64),
+    IntLit(i64, Option<Primative>),
+    FloatLit(f64, Option<Primative>),
     StrLit(String),
     BoolLit(bool),
     Uniop {
@@ -103,8 +92,8 @@ impl Expr {
     ) -> fmt::Result {
         match self {
             Expr::Id(id) => write!(f, "{id}"),
-            Expr::IntLit(n) => write!(f, "{n}"),
-            Expr::FloatLit(n) => write!(f, "{n}"),
+            Expr::IntLit(n, _) => write!(f, "{n}"),
+            Expr::FloatLit(n, _) => write!(f, "{n}"),
             Expr::StrLit(s) => write!(f, "{s:?}"),
             Expr::BoolLit(b) => write!(f, "{b}"),
             Expr::Uniop { op, arg } => {
