@@ -41,4 +41,7 @@ impl Type {
     pub fn is_bool(&self) -> bool {
         matches!(self, Type::Primitive(PrimitiveType::Bool))
     }
+    pub fn is_void(&self) -> bool {
+        matches!(self, Type::Primitive(PrimitiveType::Void))
+    }
 }

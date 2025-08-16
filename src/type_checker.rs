@@ -51,17 +51,36 @@ impl TypeCheckerContext {
     fn get_func_type(&self, name: &str) -> Option<FuncType> {
         self.functions.get(name).cloned()
     }
+
+    fn get_current_func_type(&self) -> Result<FuncType, String> {
+        let name = self
+            .func
+            .func_name
+            .as_ref()
+            .ok_or("Not in a function".to_string())?;
+        self.get_func_type(name)
+            .ok_or(format!("Could not find current function `{name}`"))
+    }
+
+    fn get_current_func_name(&self) -> Result<String, String> {
+        self.func
+            .func_name
+            .clone()
+            .ok_or("Not in a function".to_string())
+    }
 }
 
 #[derive(Clone, Debug)]
 struct TypeCheckerFunctionContext {
     locals: HashMap<String, Type>,
+    func_name: Option<String>,
 }
 
 impl<'a> TypeCheckerFunctionContext {
     fn new() -> Self {
         Self {
             locals: HashMap::new(),
+            func_name: None,
         }
     }
 
@@ -73,8 +92,9 @@ impl<'a> TypeCheckerFunctionContext {
         self.locals.insert(name, ty);
     }
 
-    fn clear(&mut self) {
+    fn reset_with_name(&mut self, func_name: String) {
         self.locals.clear();
+        self.func_name = Some(func_name);
     }
 }
 
@@ -403,6 +423,26 @@ fn check_statement(
                 Some(val) => Some(Box::new(check_expr(&val, ctx)?)),
                 None => None,
             };
+            if let Some(val) = &typed_val {
+                let val_ty = val.ty.clone();
+                let func_type = ctx.get_current_func_type()?;
+                if val_ty != *func_type.ret_type {
+                    let func_name = ctx.get_current_func_name()?;
+                    return Err(format!(
+                        "Invalid return type for function `{}`: expected `{}`, got `{}`",
+                        func_name, func_type.ret_type, val_ty
+                    ));
+                }
+            } else {
+                let func_type = ctx.get_current_func_type()?;
+                if !func_type.ret_type.is_void() {
+                    let func_name = ctx.get_current_func_name()?;
+                    return Err(format!(
+                        "Invalid return type for function `{}`: expected `{}`, got `Void`",
+                        func_name, func_type.ret_type
+                    ));
+                }
+            }
             TypedStatementKind::Return { val: typed_val }
         }
     };
@@ -438,7 +478,7 @@ pub fn check_program(program: &Program) -> Result<TypedProgram, String> {
     let mut ctx = TypeCheckerContext::new(&program)?;
     let mut typed_functions = Vec::new();
     for function in &program.functions {
-        ctx.func.clear();
+        ctx.func.reset_with_name(function.name.id.clone());
         let typed_function = check_function(&function, &mut ctx)?;
         typed_functions.push(typed_function);
         println!("{:#?}", ctx.func);
