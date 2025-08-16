@@ -30,6 +30,17 @@ pub enum Type {
     Ptr(Box<TypeWithLoc>),
 }
 
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Type::Primitive(ty1), Type::Primitive(ty2)) => ty1 == ty2,
+            (Type::Id(id1), Type::Id(id2)) => id1 == id2,
+            (Type::Ptr(ty1), Type::Ptr(ty2)) => ty1.type_ == ty2.type_,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

@@ -145,8 +145,12 @@ impl IRFunction {
         }
     }
 
-    pub fn slot_offset(&self, slow_index: usize) -> isize {
-        -((slow_index + 1) as isize * 8)
+    pub fn slot_offset(&self, slot_index: usize) -> isize {
+        assert!(
+            slot_index < self.stack_size,
+            "IRFunction::slot_offset(): index out of bounds"
+        );
+        -((slot_index + 1) as isize * 8)
     }
 }
 

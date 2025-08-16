@@ -15,7 +15,6 @@ fn load_arg<W: std::io::Write>(
 ) {
     match arg {
         Arg::Local(i) => {
-            assert!(*i < func.stack_size, "load_arg: index out of bounds");
             let offset = func.slot_offset(*i);
             writeln!(out, "    movq {offset}(%rbp), %{reg}").unwrap();
         }
@@ -38,7 +37,6 @@ fn store_reg<W: std::io::Write>(
     func: &IRFunction,
     out: &mut W,
 ) {
-    assert!(index < func.stack_size, "store_reg: index out of bounds");
     let offset = func.slot_offset(index);
     writeln!(out, "    movq %{reg}, {offset}(%rbp)").unwrap();
 }
@@ -66,6 +64,7 @@ pub fn emit_function<W: std::io::Write>(
     for i in 0..func.arg_count {
         store_reg(ARG_REGISTERS[i], i, func, out);
     }
+
     let mut used_exit_label = false;
     for (i, op) in func.body.iter().enumerate() {
         match op {

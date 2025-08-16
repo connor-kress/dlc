@@ -111,14 +111,14 @@ impl FnContext {
 }
 
 fn convert_index_expr_to_deref(
-    array: &Box<ExprWithLoc>,
-    index: &Box<ExprWithLoc>,
+    array: &ExprWithLoc,
+    index: &ExprWithLoc,
     loc: Loc,
 ) -> Result<ExprWithLoc, String> {
     let offset_in_bytes = ExprWithLoc::new(
         Expr::Binop {
             op: Binop::Mul,
-            left: index.clone(),
+            left: Box::new(index.clone()),
             right: Box::new(ExprWithLoc::new(
                 Expr::IntLit(8),
                 index.loc.clone(),
@@ -129,7 +129,7 @@ fn convert_index_expr_to_deref(
     let index_expr = ExprWithLoc::new(
         Expr::Binop {
             op: Binop::Add,
-            left: array.clone(),
+            left: Box::new(array.clone()),
             right: Box::new(offset_in_bytes),
         },
         index.loc.clone(),

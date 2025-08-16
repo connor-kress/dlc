@@ -11,6 +11,7 @@ pub struct Point {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Loc {
+    // Only include the file name for functions or modules?
     // pub file_name: String,
     pub start: Point,
     pub end: Point,
@@ -26,6 +27,7 @@ impl Loc {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveType {
     Int8,
+    Int16,
     Int32,
     Int64,
     Float32,
