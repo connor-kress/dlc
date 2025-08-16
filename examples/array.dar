@@ -12,7 +12,7 @@ fn print_array(arr: *int64, n: int64) {
     printf("]\n");
 }
 
-fn gen_array(n: int64) -> *uint64 {
+fn gen_array(n: int64) -> *int64 {
     let arr = malloc(n * 8);
     let i = 0;
     while i < n {

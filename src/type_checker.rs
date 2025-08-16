@@ -84,7 +84,7 @@ fn convert_ast_type(
 ) -> Result<Type, String> {
     Ok(match &ty.type_ {
         AstType::Primitive(ty) => Type::Primitive(*ty),
-        AstType::Id(_id) => todo!("Custom types are not yet implemented"),
+        AstType::Id(id) => todo!("Custom types are not yet implemented: {id}"),
         AstType::Ptr(ty) => Type::Ptr(Box::new(convert_ast_type(ty, ctx)?)),
     })
 }
@@ -151,6 +151,20 @@ fn get_binop_type(
                 return Err(get_error_msg());
             }
             Type::Primitive(PrimitiveType::Bool)
+        }
+        B::Assign => {
+            if left != right {
+                return Err(get_error_msg());
+            }
+            right.clone()
+        }
+        B::AssignAdd | B::AssignSub | B::AssignMul | B::AssignDiv => {
+            if !are_arithmetic_compatible_types(left, right) {
+                return Err(format!(
+                    "Invalid types for operation `{op:?}`: `{left}` and `{right}`"
+                ));
+            }
+            left.clone()
         }
         _ => todo!("type checking for binary operator `{op:?}`"),
     })
@@ -247,7 +261,7 @@ fn check_expr(
                     name: Box::new(check_expr(&name, ctx)?),
                     args: typed_args,
                 },
-                ty: Type::Primitive(PrimitiveType::Void), // TODO
+                ty: *func_type.ret_type,
                 loc: expr.loc.clone(),
             }
         }
