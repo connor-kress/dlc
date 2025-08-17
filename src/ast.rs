@@ -82,6 +82,10 @@ pub enum Expr {
         array: Box<ExprWithLoc>,
         index: Box<ExprWithLoc>,
     },
+    Cast {
+        expr: Box<ExprWithLoc>,
+        type_: TypeWithLoc,
+    },
 }
 
 impl Expr {
@@ -114,6 +118,9 @@ impl Expr {
             }
             Expr::Index { array, index } => {
                 write!(f, "Index({array}, {index})")
+            }
+            Expr::Cast { expr, type_ } => {
+                write!(f, "Cast({expr}, {type_})")
             }
         }
     }

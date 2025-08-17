@@ -13,27 +13,30 @@ use crate::{
 static MAX_PRECEDENCE: usize = 14;
 static FUNCTION_CALL_PRECEDENCE: usize = 1;
 static ARRAY_INDEX_PRECEDENCE: usize = 1;
+static CAST_PRECEDENCE: usize = 3;
+static UNARY_PRECEDENCE: usize = 2;
 
 fn is_right_associative(precedence: usize) -> bool {
     match precedence {
-        2 | 13 | 14 => true, // unary, ternary, and assignment
+        2 | 14 => true, // unary, and assignment
         _ => false,
     }
 }
 
 impl Binop {
     // https://en.cppreference.com/w/c/language/operator_precedence.html
+    // Everything shifted by one to account for the `as` operator
     fn precedence(&self) -> usize {
         match self {
-            Binop::Mul | Binop::Div => 3,
-            Binop::Add | Binop::Sub => 4,
-            Binop::Lt | Binop::Le | Binop::Gt | Binop::Ge => 6,
-            Binop::Eq | Binop::Neq => 7,
-            Binop::BitAnd => 8,
-            Binop::BitXor => 9,
-            Binop::BitOr => 10,
-            Binop::Land => 11,
-            Binop::Lor => 12,
+            Binop::Mul | Binop::Div => 4,
+            Binop::Add | Binop::Sub => 5,
+            Binop::Lt | Binop::Le | Binop::Gt | Binop::Ge => 7,
+            Binop::Eq | Binop::Neq => 8,
+            Binop::BitAnd => 9,
+            Binop::BitXor => 10,
+            Binop::BitOr => 11,
+            Binop::Land => 12,
+            Binop::Lor => 13,
             Binop::Assign
             | Binop::AssignAdd
             | Binop::AssignSub
@@ -55,12 +58,6 @@ impl Binop {
             Binop::Land => (Some(Uniop::Ref), Some(Uniop::Ref)),
             _ => (None, None),
         }
-    }
-}
-
-impl Uniop {
-    fn precedence(&self) -> usize {
-        2
     }
 }
 
@@ -249,7 +246,7 @@ fn parse_expression_at_precedence(
     let mut acc = match unary_op {
         (Some(op), None) => {
             let start = p.get_token()?.loc.start;
-            let right = parse_expression_at_precedence(p, op.precedence())?;
+            let right = parse_expression_at_precedence(p, UNARY_PRECEDENCE)?;
             let loc = Loc::new(start, right.loc.end);
             ExprWithLoc::new(
                 Expr::Uniop {
@@ -263,8 +260,7 @@ fn parse_expression_at_precedence(
             let combined_loc = p.get_token()?.loc;
             let outer_start = combined_loc.start;
             let inner_start = combined_loc.end;
-            let right =
-                parse_expression_at_precedence(p, inner_op.precedence())?;
+            let right = parse_expression_at_precedence(p, UNARY_PRECEDENCE)?;
             let inner_loc = Loc::new(inner_start, right.loc.end);
             let tmp_expr = ExprWithLoc::new(
                 Expr::Uniop {
@@ -345,6 +341,22 @@ fn parse_expression_at_precedence(
                         right: Box::new(right),
                     },
                     loc,
+                );
+            }
+            Token::As => {
+                if CAST_PRECEDENCE > precedence {
+                    break;
+                }
+                p.advance().unwrap();
+                let type_ = parse_type(p)?;
+                let end = type_.loc.end;
+                let start = acc.loc.start;
+                acc = ExprWithLoc::new(
+                    Expr::Cast {
+                        expr: Box::new(acc),
+                        type_,
+                    },
+                    Loc::new(start, end),
                 );
             }
             // Unary postfix ops will need to be handled before making a new

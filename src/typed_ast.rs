@@ -30,6 +30,10 @@ pub enum TypedExprKind {
         array: Box<TypedExpr>,
         index: Box<TypedExpr>,
     },
+    Cast {
+        expr: Box<TypedExpr>,
+        type_: Type,
+    },
 }
 
 impl TypedExprKind {
@@ -62,6 +66,9 @@ impl TypedExprKind {
             }
             TypedExprKind::Index { array, index } => {
                 write!(f, "Index({array}, {index})")
+            }
+            TypedExprKind::Cast { expr, type_ } => {
+                write!(f, "Cast({expr}, {type_})")
             }
         }
     }

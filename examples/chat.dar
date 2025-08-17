@@ -1,19 +1,24 @@
-fn main() -> i64 {
-    let name: *char = malloc(100);
+extern fn printf(fmt: *i8, ...) -> i64;
+extern fn scanf(fmt: *i8, ...) -> i64;
+extern fn malloc(bytes: i64) -> *void;
+extern fn free(ptr: *void) -> i64;
+
+fn main() -> i32 {
+    let name = malloc(100) as *i8;
     let age: i32;
     printf("Enter a name: ");
     if scanf("%99s", name) == 0 {
         printf("Error reading input.\n");
-        free(name);
-        return 1;
+        free(name as *void);
+        return 1i32;
     }
     printf("Enter an age: ");
     if scanf("%d", &age) == 0 {
         printf("Error reading input.\n");
-        free(name);
-        return 1;
+        free(name as *void);
+        return 1i32;
     }
     printf("\n%s is %d years old.\n", name, age);
-    free(name);
-    return 0;
+    free(name as *void);
+    return 0i32;
 }

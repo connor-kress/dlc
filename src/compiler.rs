@@ -302,6 +302,13 @@ fn compile_expr(
                 convert_index_expr_to_deref(array, index, expr.loc.clone())?;
             compile_expr(&index_expr, fn_ctx, proc_ctx)?
         }
+        Expr::Cast {
+            expr,
+            type_: _type_,
+        } => {
+            // TODO: implement casting
+            compile_expr(&expr, fn_ctx, proc_ctx)?
+        }
         other => {
             todo!("Missing compile_expr: {}", other);
         }

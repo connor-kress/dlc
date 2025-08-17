@@ -355,6 +355,18 @@ fn check_expr(
                 loc: expr.loc.clone(),
             }
         }
+        Expr::Cast { expr: inner, type_ } => {
+            let inner_expr = check_expr(&inner, ctx)?;
+            // TODO: Check if cast is valid
+            TypedExpr {
+                expr: TypedExprKind::Cast {
+                    expr: Box::new(inner_expr),
+                    type_: convert_ast_type(&type_, ctx)?,
+                },
+                ty: convert_ast_type(&type_, ctx)?,
+                loc: expr.loc.clone(),
+            }
+        }
     })
 }
 

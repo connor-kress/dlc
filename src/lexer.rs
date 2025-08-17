@@ -77,6 +77,7 @@ pub enum Token {
     While,
     Return,
     Extern,
+    As,
 
     // Literals
     StrLit(String),
@@ -192,6 +193,7 @@ static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
         ("while", Token::While),
         ("return", Token::Return),
         ("extern", Token::Extern),
+        ("as", Token::As),
         ("true", Token::BoolLit(true)),
         ("false", Token::BoolLit(false)),
     ])

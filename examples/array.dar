@@ -1,3 +1,8 @@
+extern fn printf(fmt: *i8, ...) -> i64;
+extern fn scanf(fmt: *i8, ...) -> i64;
+extern fn malloc(bytes: i64) -> *void;
+extern fn free(ptr: *void) -> i64;
+
 fn print_array(arr: *i64, n: i64) {
     printf("[");
     let i = 0;
@@ -13,7 +18,7 @@ fn print_array(arr: *i64, n: i64) {
 }
 
 fn gen_array(n: i64) -> *i64 {
-    let arr = malloc(n * 8);
+    let arr = malloc(n * 8) as *i64;
     let i = 0;
     while i < n {
         arr[i] = i+1;
@@ -27,19 +32,19 @@ fn gen_array(n: i64) -> *i64 {
     return arr;
 }
 
-fn main() -> i64 {
+fn main() -> i32 {
     let max_length: i64;
     printf("Enter a length: ");
     if scanf("%ld", &max_length) == 0 {
         printf("Please enter a valid length.\n");
-        return 1;
+        return 1i32;
     }
     let n = 1;
     while n <= max_length {
         let arr = gen_array(n);
         print_array(arr, n);
-        free(arr);
+        free(arr as *void);
         n += 1;
     }
-    return 0;
+    return 0i32;
 }

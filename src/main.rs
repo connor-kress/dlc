@@ -180,7 +180,7 @@ fn main() -> Result<(), String> {
     let tokens = tokenize_string(&program_source)?;
     println!("Parsing program...");
     let program = parse_program(tokens)?;
-    // println!("{program}");
+    println!("{program}");
 
     println!("Type checking program...");
     let typed_program = check_program(&program)?;
