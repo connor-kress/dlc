@@ -5,7 +5,7 @@ use crate::{
         Expr, ExprWithLoc, Function, IdWithLoc, Program, Statement,
         StatementWithLoc, Type as AstType, TypeWithLoc,
     },
-    lexer::{Binop, Primative},
+    lexer::{Binop, Primative, Uniop},
     typed_ast::{
         TypedExpr, TypedExprKind, TypedFunction, TypedProgram, TypedStatement,
         TypedStatementKind,
@@ -183,6 +183,33 @@ fn get_binop_type(
     })
 }
 
+fn get_uniop_type(op: &Uniop, arg: &Type) -> Result<Type, String> {
+    let get_error_msg =
+        || format!("Invalid type for operator `{op:?}`: `{arg}`");
+    Ok(match op {
+        Uniop::Ref => Type::Ptr(Box::new(arg.clone())),
+        Uniop::Deref => match arg {
+            Type::Ptr(ty) => *ty.clone(),
+            _ => return Err(get_error_msg()),
+        },
+        Uniop::Lnot => {
+            if !arg.is_bool() {
+                return Err(get_error_msg());
+            }
+            Type::Primitive(Primative::Bool)
+        }
+        Uniop::Plus | Uniop::Minus | Uniop::BitNot => {
+            let Type::Primitive(prim) = arg else {
+                return Err(get_error_msg());
+            };
+            if !prim.is_int() && !prim.is_float() {
+                return Err(get_error_msg());
+            }
+            arg.clone()
+        }
+    })
+}
+
 fn check_expr(
     expr: &ExprWithLoc,
     ctx: &mut TypeCheckerContext,
@@ -218,14 +245,18 @@ fn check_expr(
             loc: expr.loc.clone(),
         },
 
-        Expr::Uniop { op, arg } => TypedExpr {
-            expr: TypedExprKind::Uniop {
-                op: op.clone(),
-                arg: Box::new(check_expr(&arg, ctx)?),
-            },
-            ty: Type::Primitive(Primative::Void), // TODO
-            loc: expr.loc.clone(),
-        },
+        Expr::Uniop { op, arg } => {
+            let inner_typed = check_expr(&arg, ctx)?;
+            let inner_ty = inner_typed.ty.clone();
+            TypedExpr {
+                expr: TypedExprKind::Uniop {
+                    op: op.clone(),
+                    arg: Box::new(inner_typed),
+                },
+                ty: get_uniop_type(&op, &inner_ty)?,
+                loc: expr.loc.clone(),
+            }
+        }
 
         Expr::Binop { op, left, right } => {
             let left_typed = check_expr(&left, ctx)?;
