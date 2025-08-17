@@ -1,4 +1,4 @@
-fn print_array(arr: *int64, n: int64) {
+fn print_array(arr: *i64, n: i64) {
     printf("[");
     let i = 0;
     while i < n {
@@ -12,7 +12,7 @@ fn print_array(arr: *int64, n: int64) {
     printf("]\n");
 }
 
-fn gen_array(n: int64) -> *int64 {
+fn gen_array(n: i64) -> *i64 {
     let arr = malloc(n * 8);
     let i = 0;
     while i < n {
@@ -27,8 +27,8 @@ fn gen_array(n: int64) -> *int64 {
     return arr;
 }
 
-fn main() -> int64 {
-    let max_length: int64;
+fn main() -> i64 {
+    let max_length: i64;
     printf("Enter a length: ");
     if scanf("%ld", &max_length) == 0 {
         printf("Please enter a valid length.\n");

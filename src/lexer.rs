@@ -75,6 +75,7 @@ pub enum Token {
     Else,
     While,
     Return,
+    Extern,
 
     // Literals
     StrLit(String),
@@ -115,28 +116,30 @@ pub enum Binop {
     Land,
     BitOr,
     BitAnd,
-    BitXor, // In, // for iters
+    BitXor,
 }
 
 impl Binop {
     pub fn is_assignment(&self) -> bool {
+        use Binop as B;
         matches!(
             self,
-            Binop::Assign
-                | Binop::AssignAdd
-                | Binop::AssignSub
-                | Binop::AssignMul
-                | Binop::AssignDiv
+            B::Assign
+                | B::AssignAdd
+                | B::AssignSub
+                | B::AssignMul
+                | B::AssignDiv
         )
     }
 
     pub fn assign_op(&self) -> Result<Option<Binop>, String> {
+        use Binop as B;
         Ok(match self {
-            Binop::Assign => None,
-            Binop::AssignAdd => Some(Binop::Add),
-            Binop::AssignSub => Some(Binop::Sub),
-            Binop::AssignMul => Some(Binop::Mul),
-            Binop::AssignDiv => Some(Binop::Div),
+            B::Assign => None,
+            B::AssignAdd => Some(B::Add),
+            B::AssignSub => Some(B::Sub),
+            B::AssignMul => Some(B::Mul),
+            B::AssignDiv => Some(B::Div),
             _ => {
                 return Err(format!("Invalid assignment operator: {:?}", self));
             }
@@ -254,6 +257,7 @@ static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
         ("else", Token::Else),
         ("while", Token::While),
         ("return", Token::Return),
+        ("extern", Token::Extern),
         ("true", Token::BoolLit(true)),
         ("false", Token::BoolLit(false)),
     ])

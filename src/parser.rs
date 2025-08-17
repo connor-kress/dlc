@@ -79,8 +79,10 @@ impl Parser {
 
     #[allow(dead_code)]
     fn debug_position(&self) {
-        let lower = max(0, self.token_index - 5);
-        let upper = min(self.token_index + 5, self.tokens.len() - 1);
+        let lower = max(0, self.token_index as i64 - 5) as usize;
+        let upper =
+            min(self.token_index as i64 + 5, self.tokens.len() as i64 - 1)
+                as usize;
         println!("Tokens:");
         for i in lower..upper {
             if i == self.token_index {
@@ -501,7 +503,7 @@ fn parse_type(p: &mut Parser) -> Result<TypeWithLoc, String> {
     Ok(TypeWithLoc::new(type_, Loc::new(type_token.loc.start, end)))
 }
 
-fn parse_function(p: &mut Parser) -> Result<Function, String> {
+fn parse_function_header(p: &mut Parser) -> Result<Function, String> {
     let fn_start = p.expect_token(Token::Fn)?.loc.start;
     let name = p.expect_id()?;
     p.expect_token(Token::Lparen)?;
@@ -529,26 +531,53 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
         }
         _ => TypeWithLoc::new(Type::Primitive(Primative::Void), empty_type_loc),
     };
-    let (body, body_loc) = parse_block(p)?;
-    let fn_end = body_loc.end;
+    let fn_end = ret_type.loc.end;
     Ok(Function {
         name,
         param_list: ParamList { params },
         ret_type,
-        body,
+        body: Vec::new(),
         loc: Loc::new(fn_start, fn_end),
     })
+}
+
+fn parse_function(p: &mut Parser) -> Result<Function, String> {
+    let mut function = parse_function_header(p)?;
+    let (body, body_loc) = parse_block(p)?;
+    function.body = body;
+    function.loc.end = body_loc.end;
+    Ok(function)
 }
 
 #[allow(dead_code)]
 pub fn parse_program(tokens: Vec<TokenWithLoc>) -> Result<Program, String> {
     let mut p = Parser::new(tokens);
     let mut functions = Vec::new();
+    let mut externs = Vec::new();
     while !p.at_end() {
-        let function = parse_function(&mut p)?;
-        functions.push(function);
+        let peek = p.peek_token()?;
+        match peek.token {
+            Token::Fn => {
+                let function = parse_function(&mut p)?;
+                functions.push(function);
+            }
+            Token::Extern => {
+                let extern_start = p.expect_token(Token::Extern)?.loc.start;
+                let mut header = parse_function_header(&mut p)?;
+                let extern_end = p.expect_token(Token::Semi)?.loc.end;
+                header.loc.start = extern_start;
+                header.loc.end = extern_end;
+                externs.push(header);
+            }
+            _ => {
+                return Err(format!(
+                    "Unexpected token at start of program: {:?}",
+                    peek.token
+                ))
+            }
+        }
     }
-    Ok(Program { functions })
+    Ok(Program { functions, externs })
 }
 
 #[cfg(test)]

@@ -366,6 +366,7 @@ impl fmt::Display for Function {
 #[derive(Debug, Clone)]
 pub struct Program {
     pub functions: Vec<Function>,
+    pub externs: Vec<Function>, // no function bodies
 }
 
 impl fmt::Display for Program {

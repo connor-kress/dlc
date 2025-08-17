@@ -1,6 +1,6 @@
-fn main() -> int32 {
+fn main() -> i64 {
     let name: *char = malloc(100);
-    let age: int32;
+    let age: i32;
     printf("Enter a name: ");
     if scanf("%99s", name) == 0 {
         printf("Error reading input.\n");
