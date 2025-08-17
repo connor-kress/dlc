@@ -332,6 +332,7 @@ impl fmt::Display for StatementWithLoc {
 pub struct Function {
     pub name: IdWithLoc,
     pub param_list: ParamList,
+    pub is_variadic: bool,
     pub ret_type: TypeWithLoc,
     pub body: Vec<StatementWithLoc>,
     pub loc: Loc,
@@ -346,9 +347,13 @@ impl Function {
         let i_str = " ".repeat(indent * INDENT_WIDTH);
         write!(
             f,
-            "{i_str}{}({}, {}):\n",
+            "{i_str}{}({}, {}",
             self.name, self.param_list, self.ret_type
         )?;
+        if self.is_variadic {
+            write!(f, ", ...")?;
+        }
+        write!(f, "):\n")?;
         for statement in &self.body {
             statement.fmt_with_indent(f, indent + 1)?;
             write!(f, "\n")?;

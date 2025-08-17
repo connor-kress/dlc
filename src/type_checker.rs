@@ -27,24 +27,35 @@ impl TypeCheckerContext {
             functions: HashMap::new(),
             func: TypeCheckerFunctionContext::new(),
         };
-        let mut functions = HashMap::new();
-        for function in &program.functions {
-            println!("Parsing function: {}", function.name.id);
+        for func in &program.functions {
             let mut params = Vec::new();
-            for (id, type_) in &function.param_list.params {
+            for (id, type_) in &func.param_list.params {
                 params
                     .push((id.id.clone(), convert_ast_type(&type_, &mut ctx)?));
             }
             let func_type = FuncType {
                 params,
+                is_variadic: func.is_variadic,
+                ret_type: Box::new(convert_ast_type(&func.ret_type, &mut ctx)?),
+            };
+            ctx.functions.insert(func.name.id.clone(), func_type);
+        }
+        for extern_func in &program.externs {
+            let mut params = Vec::new();
+            for (id, type_) in &extern_func.param_list.params {
+                params
+                    .push((id.id.clone(), convert_ast_type(&type_, &mut ctx)?));
+            }
+            let func_type = FuncType {
+                params,
+                is_variadic: extern_func.is_variadic,
                 ret_type: Box::new(convert_ast_type(
-                    &function.ret_type,
+                    &extern_func.ret_type,
                     &mut ctx,
                 )?),
             };
-            functions.insert(function.name.id.clone(), func_type);
+            ctx.functions.insert(extern_func.name.id.clone(), func_type);
         }
-        ctx.functions = functions;
         Ok(ctx)
     }
 
@@ -281,11 +292,20 @@ fn check_expr(
             let Some(func_type) = ctx.get_func_type(&id.id) else {
                 return Err(format!("Undefined function `{}`", id.id));
             };
-            if func_type.params.len() != args.len() {
-                return Err(format!(
-                    "Invalid number of arguments for function `{}`: {} expected, {} provided",
-                    id.id, func_type.params.len(), args.len()
-                ));
+            if func_type.is_variadic {
+                if args.len() < func_type.params.len() {
+                    return Err(format!(
+                        "Invalid number of arguments for variadic function `{}`: {}+ expected, {} provided",
+                        id.id, func_type.params.len(), args.len()
+                    ));
+                }
+            } else {
+                if args.len() != func_type.params.len() {
+                    return Err(format!(
+                        "Invalid number of arguments for function `{}`: {} expected, {} provided",
+                        id.id, func_type.params.len(), args.len()
+                    ));
+                }
             }
             let mut typed_args = Vec::new();
             for arg in args {

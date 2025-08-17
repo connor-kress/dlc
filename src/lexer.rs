@@ -61,6 +61,7 @@ pub enum Token {
     Colon,
     Semi,
     ThinArrow,
+    Dots,
 
     Type(Primative),
     Binop(Binop),
@@ -160,73 +161,6 @@ impl TokenWithLoc {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Lexer {
-    data: Vec<char>,
-    index: usize,
-    line: usize,
-    col: usize,
-    last_point: Point,
-}
-
-impl Lexer {
-    pub fn new(data: &str) -> Self {
-        Self {
-            data: data.chars().collect(),
-            index: 0,
-            line: 1,
-            col: 1,
-            last_point: Point { line: 1, col: 1 },
-        }
-    }
-
-    fn get_char(&mut self) -> Option<char> {
-        let Some(&c) = self.data.get(self.index) else {
-            return None;
-        };
-        self.last_point = self.get_point();
-        if c == '\n' {
-            self.line += 1;
-            self.col = 1;
-        } else {
-            self.col += 1;
-        }
-        self.index += 1;
-        Some(c)
-    }
-
-    fn peek_char(&mut self) -> Option<char> {
-        self.data.get(self.index).copied()
-    }
-
-    fn skip_whitespace(&mut self) {
-        while let Some(c) = self.peek_char() {
-            if c.is_whitespace() {
-                self.get_char();
-            } else {
-                break;
-            }
-        }
-    }
-
-    fn get_point(&self) -> Point {
-        Point {
-            line: self.line,
-            col: self.col,
-        }
-    }
-
-    fn get_last_point(&self) -> Point {
-        self.last_point
-    }
-
-    fn get_char_with_point(&mut self) -> Option<(char, Point)> {
-        let point = self.get_point();
-        let c = self.get_char()?;
-        Some((c, point))
-    }
-}
-
 static SINGLE_CHAR_TOKENS: LazyLock<HashMap<char, Token>> =
     LazyLock::new(|| {
         HashMap::from([
@@ -301,6 +235,11 @@ static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
         ])
     });
 
+static OPERATOR_LIKE_TOKENS: LazyLock<HashMap<&'static str, Token>> =
+    LazyLock::new(|| {
+        HashMap::from([("...", Token::Dots), ("->", Token::ThinArrow)])
+    });
+
 pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
     LazyLock::new(|| {
         HashMap::from([
@@ -315,6 +254,73 @@ pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
             ("void", Primative::Void),
         ])
     });
+
+#[derive(Debug, Clone)]
+pub struct Lexer {
+    data: Vec<char>,
+    index: usize,
+    line: usize,
+    col: usize,
+    last_point: Point,
+}
+
+impl Lexer {
+    pub fn new(data: &str) -> Self {
+        Self {
+            data: data.chars().collect(),
+            index: 0,
+            line: 1,
+            col: 1,
+            last_point: Point { line: 1, col: 1 },
+        }
+    }
+
+    fn get_char(&mut self) -> Option<char> {
+        let Some(&c) = self.data.get(self.index) else {
+            return None;
+        };
+        self.last_point = self.get_point();
+        if c == '\n' {
+            self.line += 1;
+            self.col = 1;
+        } else {
+            self.col += 1;
+        }
+        self.index += 1;
+        Some(c)
+    }
+
+    fn peek_char(&mut self) -> Option<char> {
+        self.data.get(self.index).copied()
+    }
+
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek_char() {
+            if c.is_whitespace() {
+                self.get_char();
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn get_point(&self) -> Point {
+        Point {
+            line: self.line,
+            col: self.col,
+        }
+    }
+
+    fn get_last_point(&self) -> Point {
+        self.last_point
+    }
+
+    fn get_char_with_point(&mut self) -> Option<(char, Point)> {
+        let point = self.get_point();
+        let c = self.get_char()?;
+        Some((c, point))
+    }
+}
 
 fn read_alphabetic(l: &mut Lexer) -> TokenWithLoc {
     let (c, start) = l.get_char_with_point().unwrap();
@@ -382,8 +388,8 @@ fn read_string_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
 }
 
 fn convert_operator_string(s: &str) -> Result<Token, String> {
-    let token = if s == "->" {
-        Token::ThinArrow
+    let token = if let Some(token) = OPERATOR_LIKE_TOKENS.get(s) {
+        token.clone()
     } else if let Some(token) = BINARY_OPS.get(s) {
         Token::Binop(*token)
     } else if let Some(token) = UNARY_OPS.get(s) {

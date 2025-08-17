@@ -508,6 +508,7 @@ fn parse_function_header(p: &mut Parser) -> Result<Function, String> {
     let name = p.expect_id()?;
     p.expect_token(Token::Lparen)?;
     let mut params = Vec::<(IdWithLoc, TypeWithLoc)>::new();
+    let mut is_variadic = false;
     let mut first = true;
     while p.peek_token()?.token != Token::Rparen {
         if !first && p.peek_token().unwrap().token == Token::Comma {
@@ -517,6 +518,14 @@ fn parse_function_header(p: &mut Parser) -> Result<Function, String> {
             break;
         }
         first = false;
+        if p.peek_token().unwrap().token == Token::Dots {
+            p.advance().unwrap();
+            is_variadic = true;
+            if p.peek_token().unwrap().token == Token::Comma {
+                p.advance().unwrap();
+            }
+            break;
+        }
         let id = p.expect_id()?;
         p.expect_token(Token::Colon)?;
         let type_ = parse_type(p)?;
@@ -535,6 +544,7 @@ fn parse_function_header(p: &mut Parser) -> Result<Function, String> {
     Ok(Function {
         name,
         param_list: ParamList { params },
+        is_variadic,
         ret_type,
         body: Vec::new(),
         loc: Loc::new(fn_start, fn_end),
@@ -543,6 +553,9 @@ fn parse_function_header(p: &mut Parser) -> Result<Function, String> {
 
 fn parse_function(p: &mut Parser) -> Result<Function, String> {
     let mut function = parse_function_header(p)?;
+    if function.is_variadic {
+        return Err("Variadic functions are not yet supported".into());
+    }
     let (body, body_loc) = parse_block(p)?;
     function.body = body;
     function.loc.end = body_loc.end;

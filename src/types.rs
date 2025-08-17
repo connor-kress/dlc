@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq)]
 pub struct FuncType {
     pub params: Vec<(String, Type)>,
+    pub is_variadic: bool,
     pub ret_type: Box<Type>,
 }
 
@@ -15,6 +16,9 @@ impl fmt::Display for FuncType {
                 params.push_str(", ");
             }
             params.push_str(&format!("{name}: {ty}"));
+        }
+        if self.is_variadic {
+            params.push_str(", ...");
         }
         write!(f, "({params}) -> {ret}", ret = self.ret_type)
     }
