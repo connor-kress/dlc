@@ -134,11 +134,60 @@ fn find_type_of_id(
     }
 }
 
-fn are_arithmetic_compatible_types(lhs: &Type, _rhs: &Type) -> bool {
-    let Type::Primitive(lhs) = lhs else {
-        return false;
-    };
-    lhs.is_int() || lhs.is_float()
+fn can_implicit_cast(from: &Type, to: &Type) -> bool {
+    match (from, to) {
+        (Type::Primitive(from), Type::Primitive(to)) => {
+            if to.is_sint() {
+                if from.is_sint() {
+                    from.bit_size() <= to.bit_size()
+                } else if from.is_uint() {
+                    from.bit_size() < to.bit_size()
+                } else {
+                    false
+                }
+            } else if to.is_uint() {
+                from.is_uint() && from.bit_size() <= to.bit_size()
+            } else if to.is_float() {
+                from.is_float() && from.bit_size() <= to.bit_size()
+            } else {
+                to == from
+            }
+        }
+        (Type::Ptr(_), Type::Ptr(_)) => true,
+        (Type::Ptr(_), Type::Primitive(to)) => {
+            matches!(to, Primative::Uint64)
+        }
+        (Type::Primitive(from), Type::Ptr(_)) => from.is_uint(),
+        _ => false,
+    }
+}
+
+fn get_arithmetic_type(lhs: &Type, rhs: &Type, op: &Binop) -> Option<Type> {
+    match (lhs, rhs) {
+        (Type::Ptr(_), Type::Primitive(rhs)) => {
+            // (p + i) and (p - i)
+            if !rhs.is_int() || !matches!(op, Binop::Add | Binop::Sub) {
+                return None;
+            }
+            Some(lhs.clone())
+        }
+        (Type::Primitive(lhs), Type::Ptr(_)) => {
+            // (i + p) but not (i - p)
+            if !lhs.is_int() || !matches!(op, Binop::Add) {
+                return None;
+            }
+            Some(rhs.clone())
+        }
+        _ => {
+            if can_implicit_cast(lhs, rhs) {
+                Some(rhs.clone())
+            } else if can_implicit_cast(rhs, lhs) {
+                Some(lhs.clone())
+            } else {
+                None
+            }
+        }
+    }
 }
 
 fn get_binop_type(
@@ -149,25 +198,26 @@ fn get_binop_type(
     let get_error_msg = || {
         format!("Invalid types for operator `{op:?}`: `{left}` and `{right}`")
     };
-    if left != right {
-        return Err(get_error_msg());
-    }
     use Binop as B;
     Ok(match op {
         B::Add | B::Sub | B::Mul | B::Div => {
-            if !are_arithmetic_compatible_types(left, right) {
-                return Err(format!(
-                    "Invalid types for operation `{op:?}`: `{left}` and `{right}`"
-                ));
-            }
-            left.clone()
+            get_arithmetic_type(left, right, op).ok_or_else(get_error_msg)?
         }
         B::Eq | B::Neq => {
-            // TODO: Check if types are equatable
+            if get_arithmetic_type(left, right, op).is_none() {
+                return Err(get_error_msg());
+            }
             Type::Primitive(Primative::Bool)
         }
         B::Lt | B::Le | B::Gt | B::Ge => {
-            // TODO: Check if types are ordinal
+            if left.is_ptr() && right.is_ptr() {
+                return Ok(Type::Primitive(Primative::Bool));
+            }
+            let res_type = get_arithmetic_type(left, right, op)
+                .ok_or_else(get_error_msg)?;
+            if !res_type.is_arithmetic() {
+                return Err(get_error_msg());
+            }
             Type::Primitive(Primative::Bool)
         }
         B::Land | B::Lor => {
@@ -177,16 +227,14 @@ fn get_binop_type(
             Type::Primitive(Primative::Bool)
         }
         B::Assign => {
-            if left != right {
+            if !can_implicit_cast(right, left) {
                 return Err(get_error_msg());
             }
-            right.clone()
+            left.clone()
         }
         B::AssignAdd | B::AssignSub | B::AssignMul | B::AssignDiv => {
-            if !are_arithmetic_compatible_types(left, right) {
-                return Err(format!(
-                    "Invalid types for operation `{op:?}`: `{left}` and `{right}`"
-                ));
+            if !can_implicit_cast(right, left) {
+                return Err(get_error_msg());
             }
             left.clone()
         }
@@ -234,7 +282,7 @@ fn check_expr(
 
         Expr::IntLit(n, hint) => TypedExpr {
             expr: TypedExprKind::IntLit(*n),
-            ty: Type::Primitive(hint.unwrap_or(Primative::Int64)),
+            ty: Type::Primitive(hint.unwrap_or(Primative::Int32)),
             loc: expr.loc.clone(),
         },
 
@@ -246,7 +294,7 @@ fn check_expr(
 
         Expr::StrLit(s) => TypedExpr {
             expr: TypedExprKind::StrLit(s.clone()),
-            ty: Type::Ptr(Box::new(Type::Primitive(Primative::Int8))),
+            ty: Type::Ptr(Box::new(Type::Primitive(Primative::Uint8))),
             loc: expr.loc.clone(),
         },
 
@@ -313,7 +361,7 @@ fn check_expr(
                 typed_args.push(typed_arg);
             }
             for (param, arg) in func_type.params.iter().zip(typed_args.iter()) {
-                if param.1 != arg.ty {
+                if !can_implicit_cast(&arg.ty, &param.1) {
                     return Err(format!(
                         "Invalid argument type for function `{}`: expected `{}`, got `{}`",
                         id.id, param.1, arg.ty
@@ -340,7 +388,7 @@ fn check_expr(
                 ));
             };
             let item_ty = *item_ty.clone();
-            if !matches!(index.ty, Type::Primitive(Primative::Int64)) {
+            if !matches!(index.ty, Type::Primitive(Primative::Uint64)) {
                 return Err(format!(
                     "Invalid type for array index: `{}`",
                     index.ty
@@ -357,13 +405,20 @@ fn check_expr(
         }
         Expr::Cast { expr: inner, type_ } => {
             let inner_expr = check_expr(&inner, ctx)?;
+            let type_ = convert_ast_type(&type_, ctx)?;
             // TODO: Check if cast is valid
+            // if !can_cast(&inner_expr.ty, &type_) {
+            //     return Err(format!(
+            //         "Invalid cast from `{}` to `{}`",
+            //         inner_expr.ty, type_
+            //     ));
+            // }
             TypedExpr {
                 expr: TypedExprKind::Cast {
                     expr: Box::new(inner_expr),
-                    type_: convert_ast_type(&type_, ctx)?,
+                    type_: type_.clone(),
                 },
-                ty: convert_ast_type(&type_, ctx)?,
+                ty: type_,
                 loc: expr.loc.clone(),
             }
         }
@@ -426,6 +481,13 @@ fn check_statement(
             if_block,
             else_block,
         } => {
+            let typed_cond = check_expr(&cond, ctx)?;
+            if !typed_cond.ty.is_bool() {
+                return Err(format!(
+                    "Invalid type for if condition: `{}`",
+                    typed_cond.ty
+                ));
+            }
             let mut typed_if_block = Vec::new();
             for statement in if_block {
                 let typed_statement = check_statement(&statement, ctx)?;
@@ -443,7 +505,7 @@ fn check_statement(
                 None => None,
             };
             TypedStatementKind::If {
-                cond: Box::new(check_expr(&cond, ctx)?),
+                cond: Box::new(typed_cond),
                 if_block: typed_if_block,
                 else_block: typed_else_block,
             }
@@ -457,13 +519,20 @@ fn check_statement(
             TypedStatementKind::Loop { body: typed_body }
         }
         Statement::WhileLoop { pred, body } => {
+            let typed_pred = check_expr(&pred, ctx)?;
+            if !typed_pred.ty.is_bool() {
+                return Err(format!(
+                    "Invalid type for while condition: `{}`",
+                    typed_pred.ty
+                ));
+            }
             let mut typed_body = Vec::new();
             for statement in body {
                 let typed_statement = check_statement(&statement, ctx)?;
                 typed_body.push(typed_statement);
             }
             TypedStatementKind::WhileLoop {
-                pred: Box::new(check_expr(&pred, ctx)?),
+                pred: Box::new(typed_pred),
                 body: typed_body,
             }
         }

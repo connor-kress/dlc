@@ -23,28 +23,64 @@ impl Loc {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Primative {
     Int8,
     Int16,
     Int32,
     Int64,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
     Float32,
     Float64,
     Bool,
     Void,
 }
 
+#[allow(dead_code)]
 impl Primative {
-    pub fn is_int(&self) -> bool {
+    pub fn is_bool(&self) -> bool {
+        use Primative as P;
+        matches!(self, P::Bool)
+    }
+
+    pub fn bit_size(&self) -> u8 {
+        use Primative as P;
+        match self {
+            P::Int8 | P::Uint8 => 8,
+            P::Int16 | P::Uint16 => 16,
+            P::Int32 | P::Uint32 | P::Float32 => 32,
+            P::Int64 | P::Uint64 | P::Float64 => 64,
+            P::Bool => 1,
+            P::Void => 0,
+        }
+    }
+
+    pub fn is_sint(&self) -> bool {
         use Primative as P;
         matches!(self, P::Int8 | P::Int16 | P::Int32 | P::Int64)
+    }
+
+    pub fn is_uint(&self) -> bool {
+        use Primative as P;
+        matches!(self, P::Uint8 | P::Uint16 | P::Uint32 | P::Uint64)
+    }
+
+    #[inline]
+    pub fn is_int(&self) -> bool {
+        self.is_sint() || self.is_uint()
     }
 
     pub fn is_float(&self) -> bool {
         use Primative as P;
         matches!(self, P::Float32 | P::Float64)
+    }
+
+    #[inline]
+    pub fn is_arithmetic(&self) -> bool {
+        self.is_int() || self.is_float()
     }
 }
 
@@ -249,6 +285,10 @@ pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
             ("i16", Primative::Int16),
             ("i32", Primative::Int32),
             ("i64", Primative::Int64),
+            ("u8", Primative::Uint8),
+            ("u16", Primative::Uint16),
+            ("u32", Primative::Uint32),
+            ("u64", Primative::Uint64),
             ("char", Primative::Int8),
             ("f32", Primative::Float32),
             ("f64", Primative::Float64),

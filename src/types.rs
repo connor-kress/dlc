@@ -41,11 +41,38 @@ impl fmt::Display for Type {
     }
 }
 
+#[allow(dead_code)]
 impl Type {
     pub fn is_bool(&self) -> bool {
         matches!(self, Type::Primitive(Primative::Bool))
     }
+
     pub fn is_void(&self) -> bool {
         matches!(self, Type::Primitive(Primative::Void))
+    }
+
+    pub fn is_ptr(&self) -> bool {
+        matches!(self, Type::Ptr(_))
+    }
+
+    pub fn is_int(&self) -> bool {
+        let Type::Primitive(prim) = self else {
+            return false;
+        };
+        prim.is_int()
+    }
+
+    pub fn is_float(&self) -> bool {
+        let Type::Primitive(prim) = self else {
+            return false;
+        };
+        prim.is_float()
+    }
+
+    pub fn is_arithmetic(&self) -> bool {
+        let Type::Primitive(prim) = self else {
+            return false;
+        };
+        prim.is_arithmetic()
     }
 }

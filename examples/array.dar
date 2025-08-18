@@ -1,50 +1,50 @@
-extern fn printf(fmt: *i8, ...) -> i64;
-extern fn scanf(fmt: *i8, ...) -> i64;
-extern fn malloc(bytes: i64) -> *void;
+extern fn printf(fmt: *u8, ...) -> i64;
+extern fn scanf(fmt: *u8, ...) -> i64;
+extern fn malloc(bytes: u64) -> *void;
 extern fn free(ptr: *void) -> i64;
 
-fn print_array(arr: *i64, n: i64) {
+fn print_array(arr: *i64, n: u64) {
     printf("[");
-    let i = 0;
+    let i = 0u64;
     while i < n {
-        if i == 0 {
+        if i == 0u64 {
             printf("%ld", arr[i]);
         } else {
             printf(", %ld", arr[i]);
         }
-        i += 1;
+        i += 1u64;
     }
     printf("]\n");
 }
 
-fn gen_array(n: i64) -> *i64 {
-    let arr = malloc(n * 8) as *i64;
-    let i = 0;
+fn gen_array(n: u64) -> *i64 {
+    let arr = malloc(n * 8u64) as *i64;
+    let i = 0u64;
     while i < n {
-        arr[i] = i+1;
-        i += 1;
+        arr[i] = i as i64 + 1;
+        i += 1u64;
     }
-    let i = 1;
+    let i = 1u64;
     while i < n {
         arr[i] *= 10;
-        i += 2;
+        i += 2u64;
     }
     return arr;
 }
 
 fn main() -> i32 {
-    let max_length: i64;
+    let max_length: u64;
     printf("Enter a length: ");
-    if scanf("%ld", &max_length) == 0 {
+    if scanf("%ld", &max_length) == 0i64 {
         printf("Please enter a valid length.\n");
-        return 1i32;
+        return 1;
     }
-    let n = 1;
+    let n = 1u64;
     while n <= max_length {
         let arr = gen_array(n);
         print_array(arr, n);
         free(arr as *void);
-        n += 1;
+        n += 1u64;
     }
-    return 0i32;
+    return 0;
 }

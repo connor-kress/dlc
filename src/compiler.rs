@@ -120,7 +120,7 @@ fn convert_index_expr_to_deref(
             op: Binop::Mul,
             left: Box::new(index.clone()),
             right: Box::new(ExprWithLoc::new(
-                Expr::IntLit(8, Some(Primative::Int64)),
+                Expr::IntLit(8, Some(Primative::Uint64)),
                 index.loc.clone(),
             )),
         },
