@@ -55,6 +55,20 @@ impl Type {
         matches!(self, Type::Ptr(_))
     }
 
+    pub fn is_fn_ptr(&self) -> bool {
+        let Type::Ptr(ty) = self else {
+            return false;
+        };
+        matches!(ty.as_ref(), Type::Func(_))
+    }
+
+    pub fn is_obj_ptr(&self) -> bool {
+        let Type::Ptr(ty) = self else {
+            return false;
+        };
+        !matches!(ty.as_ref(), Type::Func(_))
+    }
+
     pub fn is_int(&self) -> bool {
         let Type::Primitive(prim) = self else {
             return false;

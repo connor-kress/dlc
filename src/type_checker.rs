@@ -134,31 +134,46 @@ fn find_type_of_id(
     }
 }
 
+fn can_explicit_cast(from: &Type, to: &Type) -> bool {
+    match (from, to) {
+        // Value casts between primitives
+        (Type::Primitive(f), Type::Primitive(t)) => {
+            !f.is_void() && !t.is_void()
+        }
+        (Type::Ptr(_), Type::Ptr(_)) => {
+            (from.is_obj_ptr() && to.is_obj_ptr())
+                || (from.is_fn_ptr() && to.is_fn_ptr())
+        }
+        (Type::Ptr(_), Type::Primitive(t)) => {
+            matches!(t, Primative::Uint64 | Primative::Int64)
+        }
+        (Type::Primitive(f), Type::Ptr(_)) => {
+            matches!(f, Primative::Uint64 | Primative::Int64)
+        }
+        _ => false,
+    }
+}
+
 fn can_implicit_cast(from: &Type, to: &Type) -> bool {
     match (from, to) {
-        (Type::Primitive(from), Type::Primitive(to)) => {
-            if to.is_sint() {
-                if from.is_sint() {
-                    from.bit_size() <= to.bit_size()
-                } else if from.is_uint() {
-                    from.bit_size() < to.bit_size()
+        (Type::Primitive(f), Type::Primitive(t)) => {
+            if t.is_sint() {
+                if f.is_sint() {
+                    f.bits() <= t.bits()
+                } else if f.is_uint() {
+                    f.bits() < t.bits()
                 } else {
                     false
                 }
-            } else if to.is_uint() {
-                from.is_uint() && from.bit_size() <= to.bit_size()
-            } else if to.is_float() {
-                from.is_float() && from.bit_size() <= to.bit_size()
+            } else if t.is_uint() {
+                f.is_uint() && f.bits() <= t.bits()
+            } else if t.is_float() {
+                f.is_float() && f.bits() <= t.bits()
             } else {
-                to == from
+                t == f
             }
         }
-        (Type::Ptr(_), Type::Ptr(_)) => true,
-        (Type::Ptr(_), Type::Primitive(to)) => {
-            matches!(to, Primative::Uint64)
-        }
-        (Type::Primitive(from), Type::Ptr(_)) => from.is_uint(),
-        _ => false,
+        _ => from == to,
     }
 }
 
@@ -406,13 +421,12 @@ fn check_expr(
         Expr::Cast { expr: inner, type_ } => {
             let inner_expr = check_expr(&inner, ctx)?;
             let type_ = convert_ast_type(&type_, ctx)?;
-            // TODO: Check if cast is valid
-            // if !can_cast(&inner_expr.ty, &type_) {
-            //     return Err(format!(
-            //         "Invalid cast from `{}` to `{}`",
-            //         inner_expr.ty, type_
-            //     ));
-            // }
+            if !can_explicit_cast(&inner_expr.ty, &type_) {
+                return Err(format!(
+                    "Invalid cast from `{}` to `{}`",
+                    inner_expr.ty, type_
+                ));
+            }
             TypedExpr {
                 expr: TypedExprKind::Cast {
                     expr: Box::new(inner_expr),

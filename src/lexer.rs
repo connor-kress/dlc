@@ -42,11 +42,14 @@ pub enum Primative {
 #[allow(dead_code)]
 impl Primative {
     pub fn is_bool(&self) -> bool {
-        use Primative as P;
-        matches!(self, P::Bool)
+        matches!(self, Primative::Bool)
     }
 
-    pub fn bit_size(&self) -> u8 {
+    pub fn is_void(&self) -> bool {
+        matches!(self, Primative::Void)
+    }
+
+    pub fn bits(&self) -> u8 {
         use Primative as P;
         match self {
             P::Int8 | P::Uint8 => 8,

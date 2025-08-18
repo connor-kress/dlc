@@ -1,5 +1,5 @@
-extern fn printf(fmt: *i8, ...) -> i64;
-extern fn scanf(fmt: *i8, ...) -> i64;
+extern fn printf(fmt: *u8, ...) -> i64;
+extern fn scanf(fmt: *u8, ...) -> i64;
 extern fn malloc(bytes: i64) -> *void;
 extern fn free(ptr: *void) -> i64;
 
