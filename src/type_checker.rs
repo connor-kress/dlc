@@ -471,6 +471,12 @@ fn check_statement(
                 (Some(val), Some(type_)) => {
                     let val_ty = val.ty.clone();
                     let type_ty = convert_ast_type(type_, ctx)?;
+                    if type_ty.is_void() {
+                        return Err(format!(
+                            "Invalid type for variable `{}`: expected non-void, got `Void`",
+                            name.id
+                        ));
+                    }
                     if val_ty != type_ty {
                         return Err(format!(
                             "Invalid type for variable `{}`: expected `{}`, got `{}`",
@@ -480,12 +486,24 @@ fn check_statement(
                     ctx.func.add_local(name.id.clone(), type_ty);
                 }
                 (Some(val), None) => {
-                    let ty = val.ty.clone();
-                    ctx.func.add_local(name.id.clone(), ty);
+                    let val_ty = val.ty.clone();
+                    if val_ty.is_void() {
+                        return Err(format!(
+                            "Invalid type for variable `{}`: expected non-void, got `Void`",
+                            name.id
+                        ));
+                    }
+                    ctx.func.add_local(name.id.clone(), val_ty);
                 }
                 (None, Some(type_)) => {
-                    let ty = convert_ast_type(type_, ctx)?;
-                    ctx.func.add_local(name.id.clone(), ty);
+                    let type_ty = convert_ast_type(type_, ctx)?;
+                    if type_ty.is_void() {
+                        return Err(format!(
+                            "Invalid type for variable `{}`: expected non-void, got `Void`",
+                            name.id
+                        ));
+                    }
+                    ctx.func.add_local(name.id.clone(), type_ty);
                 }
                 (None, None) => {
                     todo!("Multi-statement type inference");
