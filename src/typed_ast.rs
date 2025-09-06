@@ -261,7 +261,8 @@ impl fmt::Display for TypedStatement {
 pub struct TypedFunction {
     pub name: IdWithLoc,
     pub param_list: ParamList,
-    pub ret_type: TypeWithLoc,
+    pub ret_type_expr: TypeWithLoc,
+    pub ret_type: Type,
     pub body: Vec<TypedStatement>,
     pub loc: Loc,
 }

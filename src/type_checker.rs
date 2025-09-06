@@ -442,19 +442,26 @@ fn check_expr(
 fn check_statement(
     statement: &StatementWithLoc,
     ctx: &mut TypeCheckerContext,
-) -> Result<TypedStatement, String> {
+) -> Result<(TypedStatement, bool), String> {
+    let mut did_ret = false;
     let typed_statement = match &statement.statement {
         Statement::Expr(expr) => {
             TypedStatementKind::Expr(check_expr(&expr, ctx)?)
         }
+
         Statement::Block(statements) => {
             let mut typed_statements = Vec::new();
             for statement in statements {
-                let typed_statement = check_statement(&statement, ctx)?;
+                let (typed_statement, stmt_did_ret) =
+                    check_statement(&statement, ctx)?;
+                if stmt_did_ret {
+                    did_ret = true;
+                }
                 typed_statements.push(typed_statement);
             }
             TypedStatementKind::Block(typed_statements)
         }
+
         Statement::VarDecl { name, type_, val } => {
             let typed_val = match val {
                 Some(val) => Some(Box::new(check_expr(&val, ctx)?)),
@@ -490,6 +497,7 @@ fn check_statement(
                 val: typed_val,
             }
         }
+
         Statement::If {
             cond,
             if_block,
@@ -503,35 +511,55 @@ fn check_statement(
                 ));
             }
             let mut typed_if_block = Vec::new();
+            let mut if_did_ret = false;
             for statement in if_block {
-                let typed_statement = check_statement(&statement, ctx)?;
+                let (typed_statement, stmt_did_ret) =
+                    check_statement(&statement, ctx)?;
+                if stmt_did_ret {
+                    if_did_ret = true;
+                }
                 typed_if_block.push(typed_statement);
             }
+            let mut else_did_ret = false;
             let typed_else_block = match else_block {
                 Some(else_block) => {
                     let mut typed_else_block = Vec::new();
                     for statement in else_block {
-                        let typed_statement = check_statement(&statement, ctx)?;
+                        let (typed_statement, stmt_did_ret) =
+                            check_statement(&statement, ctx)?;
+                        if stmt_did_ret {
+                            else_did_ret = true;
+                        }
                         typed_else_block.push(typed_statement);
                     }
                     Some(typed_else_block)
                 }
                 None => None,
             };
+            if if_did_ret && else_did_ret {
+                did_ret = true;
+            }
             TypedStatementKind::If {
                 cond: Box::new(typed_cond),
                 if_block: typed_if_block,
                 else_block: typed_else_block,
             }
         }
+
         Statement::Loop { body } => {
             let mut typed_body = Vec::new();
             for statement in body {
-                let typed_statement = check_statement(&statement, ctx)?;
+                let (typed_statement, stmt_did_ret) =
+                    check_statement(&statement, ctx)?;
+                if stmt_did_ret {
+                    // TODO: disable this after break/continue
+                    did_ret = true;
+                }
                 typed_body.push(typed_statement);
             }
             TypedStatementKind::Loop { body: typed_body }
         }
+
         Statement::WhileLoop { pred, body } => {
             let typed_pred = check_expr(&pred, ctx)?;
             if !typed_pred.ty.is_bool() {
@@ -542,7 +570,12 @@ fn check_statement(
             }
             let mut typed_body = Vec::new();
             for statement in body {
-                let typed_statement = check_statement(&statement, ctx)?;
+                let (typed_statement, stmt_did_ret) =
+                    check_statement(&statement, ctx)?;
+                if stmt_did_ret {
+                    // TODO: disable this after break/continue
+                    did_ret = true;
+                }
                 typed_body.push(typed_statement);
             }
             TypedStatementKind::WhileLoop {
@@ -550,14 +583,19 @@ fn check_statement(
                 body: typed_body,
             }
         }
+
         Statement::ForLoop { .. } => {
             todo!("For loops are not yet implemented")
         }
+
         Statement::Break => todo!("Break statements are not yet implemented"),
+
         Statement::Continue => {
             todo!("Continue statements are not yet implemented")
         }
+
         Statement::Return { val } => {
+            did_ret = true;
             let typed_val = match val {
                 Some(val) => Some(Box::new(check_expr(&val, ctx)?)),
                 None => None,
@@ -585,10 +623,12 @@ fn check_statement(
             TypedStatementKind::Return { val: typed_val }
         }
     };
-    Ok(TypedStatement {
+
+    let typed_statement = TypedStatement {
         statement: typed_statement,
         loc: statement.loc.clone(),
-    })
+    };
+    Ok((typed_statement, did_ret))
 }
 
 fn check_function(
@@ -600,14 +640,32 @@ fn check_function(
         ctx.func.add_local(param.id.clone(), ty);
     }
     let mut typed_statements = Vec::new();
+    let mut did_ret = false;
     for statement in &function.body {
-        let typed_statement = check_statement(&statement, ctx)?;
+        if did_ret {
+            eprintln!(
+                "Warning: function `{}` has unreachable code",
+                function.name.id
+            );
+        }
+        let (typed_statement, stmt_did_ret) = check_statement(&statement, ctx)?;
+        if stmt_did_ret {
+            did_ret = true;
+        }
         typed_statements.push(typed_statement);
+    }
+    let ret_type = ctx.get_current_func_type()?.ret_type.clone();
+    if !did_ret && !ret_type.is_void() {
+        return Err(format!(
+            "Function `{}` does not return a value",
+            function.name.id,
+        ));
     }
     Ok(TypedFunction {
         name: function.name.clone(),
         param_list: function.param_list.clone(),
-        ret_type: function.ret_type.clone(),
+        ret_type_expr: function.ret_type.clone(),
+        ret_type: *ret_type,
         body: typed_statements,
         loc: function.loc.clone(),
     })
