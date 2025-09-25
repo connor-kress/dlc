@@ -4,6 +4,7 @@ mod compiler;
 mod ir;
 mod lexer;
 mod parser;
+mod stdlib;
 mod type_checker;
 mod typed_ast;
 mod types;
@@ -172,11 +173,12 @@ fn main() -> Result<(), String> {
     let cli = parse_cli_args()?;
 
     let input_path = &cli.input_files[0];
-    let program_source = {
+    let mut program_source =
         std::fs::read_to_string(input_path).map_err(|e| {
             format!("Failed to read file '{}': {}", input_path.display(), e)
-        })?
-    };
+        })?;
+    // TODO: Use an actual module system
+    program_source.push_str(stdlib::STDLIB);
     let tokens = tokenize_string(&program_source)?;
     println!("Parsing program...");
     let program = parse_program(tokens)?;

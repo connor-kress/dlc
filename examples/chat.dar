@@ -1,10 +1,5 @@
-extern fn printf(fmt: *u8, ...) -> i64;
-extern fn scanf(fmt: *u8, ...) -> i64;
-extern fn malloc(bytes: i64) -> *void;
-extern fn free(ptr: *void) -> i64;
-
 fn main() -> i32 {
-    let name = malloc(100) as *i8;
+    let name = malloc(100u64) as *i8;
     let age: i32;
     printf("Enter a name: ");
     if scanf("%99s", name) == 0 {

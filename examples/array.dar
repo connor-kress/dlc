@@ -1,8 +1,3 @@
-extern fn printf(fmt: *u8, ...) -> i64;
-extern fn scanf(fmt: *u8, ...) -> i64;
-extern fn malloc(bytes: u64) -> *void;
-extern fn free(ptr: *void) -> i64;
-
 fn print_array(arr: *i64, n: u64) {
     printf("[");
     let i = 0u64;
