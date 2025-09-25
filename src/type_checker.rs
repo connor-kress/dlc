@@ -313,6 +313,12 @@ fn check_expr(
             loc: expr.loc.clone(),
         },
 
+        Expr::CharLit(c) => TypedExpr {
+            expr: TypedExprKind::CharLit(*c),
+            ty: Type::Primitive(Primative::Uint8),
+            loc: expr.loc.clone(),
+        },
+
         Expr::BoolLit(b) => TypedExpr {
             expr: TypedExprKind::BoolLit(*b),
             ty: Type::Primitive(Primative::Bool),

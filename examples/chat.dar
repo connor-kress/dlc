@@ -1,11 +1,14 @@
 fn main() -> i32 {
-    let name = malloc(100u64) as *i8;
+    let name = malloc(100u64) as *u8;
     let age: i32;
     printf("Enter a name: ");
     if scanf("%99s", name) == 0 {
         printf("Error reading input.\n");
         free(name as *void);
         return 1i32;
+    }
+    if name[0u64] == "secret-code"[0u64] {
+        printf("Congratulations! You found the secret code!\n");
     }
     printf("Enter an age: ");
     if scanf("%d", &age) == 0 {

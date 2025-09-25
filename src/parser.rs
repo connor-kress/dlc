@@ -203,6 +203,7 @@ fn parse_atomic_expression(p: &mut Parser) -> Result<ExprWithLoc, String> {
         Token::Id(id) => Expr::Id(IdWithLoc::new(id, peek.loc.clone())),
         Token::NumLit(i) => parse_numeric_literal(&i)?,
         Token::StrLit(s) => Expr::StrLit(s),
+        Token::CharLit(c) => Expr::CharLit(c),
         Token::BoolLit(b) => Expr::BoolLit(b),
         _ => {
             return Err(format!("Expected expression, got {:?}", peek.token));

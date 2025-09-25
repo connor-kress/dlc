@@ -162,6 +162,13 @@ fn compile_expr(
             let index = proc_ctx.add_string_literal(s.clone());
             Arg::DataLabel(format!(".STR{index}"))
         }
+        Expr::CharLit(c) => {
+            if !c.is_ascii() {
+                return Err(format!("Non-ASCII character: `{c}`"));
+            }
+            let byte = *c as u8;
+            Arg::Literal(byte.into())
+        }
         Expr::BoolLit(b) => Arg::Literal((*b).into()),
         Expr::Binop { op, left, right } if op.is_assignment() => {
             match &left.expr {
