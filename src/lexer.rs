@@ -120,6 +120,7 @@ pub enum Token {
 
     // Literals
     StrLit(String),
+    CharLit(char),
     NumLit(String),
     BoolLit(bool),
 }
@@ -404,6 +405,22 @@ fn read_numeric_literal(l: &mut Lexer) -> TokenWithLoc {
     TokenWithLoc::new(Token::NumLit(acc), Loc::new(start, end))
 }
 
+fn read_escape_sequence(l: &mut Lexer) -> Result<char, String> {
+    let Some(c) = l.get_char() else {
+        return Err(format!("Expected escape sequence"));
+    };
+    Ok(match c {
+        '0' => '\0',
+        'n' => '\n',
+        'r' => '\r',
+        't' => '\t',
+        '"' => '"',
+        '\'' => '\'',
+        '\\' => '\\',
+        _ => return Err(format!("Invalid escape sequence: \\{c}")),
+    })
+}
+
 fn read_string_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
     let (_, start) = l.get_char_with_point().unwrap();
     let mut acc = String::new();
@@ -416,14 +433,8 @@ fn read_string_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
             }
             '\\' => {
                 l.get_char().unwrap();
-                match l.get_char().unwrap() {
-                    'n' => acc.push('\n'),
-                    'r' => acc.push('\r'),
-                    't' => acc.push('\t'),
-                    '"' => acc.push('\"'),
-                    '\\' => acc.push('\\'),
-                    _ => return Err(format!("Invalid escape sequence: \\{c}")),
-                }
+                let esc = read_escape_sequence(l)?;
+                acc.push(esc);
             }
             _ => {
                 acc.push(l.get_char().unwrap());
@@ -431,6 +442,21 @@ fn read_string_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
         }
     }
     Ok(TokenWithLoc::new(Token::StrLit(acc), Loc::new(start, end)))
+}
+
+fn read_char_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
+    let (_, start) = l.get_char_with_point().unwrap();
+    let c = match l.get_char().unwrap() {
+        '\'' => {
+            return Err(format!("Empty char literal"));
+        }
+        '\\' => read_escape_sequence(l)?,
+        c => c,
+    };
+    let Some(('\'', end)) = l.get_char_with_point() else {
+        return Err(format!("Unterminated char literal"));
+    };
+    Ok(TokenWithLoc::new(Token::CharLit(c), Loc::new(start, end)))
 }
 
 fn convert_operator_string(s: &str) -> Result<Token, String> {
@@ -484,6 +510,8 @@ fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
         read_numeric_literal(l)
     } else if next == '"' {
         read_string_literal(l)?
+    } else if next == '\'' {
+        read_char_literal(l)?
     } else {
         read_operator(l)?
     };
