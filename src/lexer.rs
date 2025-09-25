@@ -420,6 +420,7 @@ fn read_string_literal(l: &mut Lexer) -> Result<TokenWithLoc, String> {
                     'n' => acc.push('\n'),
                     'r' => acc.push('\r'),
                     't' => acc.push('\t'),
+                    '"' => acc.push('\"'),
                     '\\' => acc.push('\\'),
                     _ => return Err(format!("Invalid escape sequence: \\{c}")),
                 }
