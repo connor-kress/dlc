@@ -7,7 +7,7 @@ fn main() -> i32 {
         free(name as *void);
         return 1i32;
     }
-    if name[0u64] == "secret-code"[0u64] {
+    if strcmp(name, "secret-code") == 0i32 {
         printf("Congratulations! You found the secret code!\n");
     }
     printf("Enter an age: ");
