@@ -340,6 +340,12 @@ impl Lexer {
         self.data.get(self.index).copied()
     }
 
+    fn peek_str(&mut self, n: usize) -> Option<String> {
+        self.data
+            .get(self.index..self.index + n)
+            .map(|s| s.iter().collect())
+    }
+
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.peek_char() {
             if c.is_whitespace() {
@@ -348,6 +354,59 @@ impl Lexer {
                 break;
             }
         }
+    }
+
+    fn is_comment_next(&mut self) -> bool {
+        match self.peek_str(2) {
+            Some(s) if s == "//" => true,
+            Some(s) if s == "/*" => true,
+            _ => false,
+        }
+    }
+
+    fn skip_comment(&mut self) -> Result<(), String> {
+        let Some(pre) = self.peek_str(2) else {
+            return Ok(());
+        };
+        if pre == "/*" {
+            self.get_char();
+            self.get_char();
+            loop {
+                let Some(post) = self.peek_str(2) else {
+                    return Err(format!("Unterminated block comment"));
+                };
+                if post == "*/" {
+                    self.get_char();
+                    self.get_char();
+                    break;
+                }
+                self.get_char();
+            }
+        }
+        if pre == "//" {
+            self.get_char();
+            self.get_char();
+            while let Some(c) = self.peek_char() {
+                if c == '\n' {
+                    break;
+                } else {
+                    self.get_char();
+                };
+            }
+        }
+        Ok(())
+    }
+
+    fn skip_comments_and_whitespace(&mut self) -> Result<(), String> {
+        loop {
+            self.skip_whitespace();
+            if self.is_comment_next() {
+                self.skip_comment()?;
+            } else {
+                break;
+            }
+        }
+        Ok(())
     }
 
     fn get_point(&self) -> Point {
@@ -497,7 +556,7 @@ fn read_operator(l: &mut Lexer) -> Result<TokenWithLoc, String> {
 }
 
 fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
-    l.skip_whitespace();
+    l.skip_comments_and_whitespace()?;
     let Some(next) = l.peek_char() else {
         return Ok(None);
     };
@@ -521,7 +580,6 @@ fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
 #[allow(dead_code)]
 pub fn tokenize_string(s: &str) -> Result<Vec<TokenWithLoc>, String> {
     let mut l = Lexer::new(s);
-    l.skip_whitespace();
     let mut tokens = Vec::new();
     while let Some(token) = get_next_token(&mut l)? {
         tokens.push(token);
