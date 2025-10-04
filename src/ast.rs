@@ -378,15 +378,37 @@ impl fmt::Display for Function {
 }
 
 #[derive(Debug, Clone)]
-pub struct Program {
+pub struct Module {
     pub functions: Vec<Function>,
     pub externs: Vec<Function>, // no function bodies
 }
 
-impl fmt::Display for Program {
+impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for function in &self.functions {
             write!(f, "{function}\n\n")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Program {
+    pub modules: Vec<Module>,
+}
+
+impl Program {
+    pub fn new() -> Self {
+        Self {
+            modules: Vec::new(),
+        }
+    }
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for module in &self.modules {
+            write!(f, "{module}\n\n")?;
         }
         Ok(())
     }

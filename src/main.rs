@@ -12,11 +12,12 @@ mod types;
 use codegen::emit_program;
 use compiler::compile_program;
 use lexer::tokenize_string;
-use parser::parse_program;
+use parser::parse_module;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use crate::ast::Program;
 use crate::type_checker::check_program;
 
 fn assemble_and_link_program(
@@ -177,21 +178,38 @@ fn main() -> Result<(), String> {
         std::fs::read_to_string(input_path).map_err(|e| {
             format!("Failed to read file '{}': {}", input_path.display(), e)
         })?;
-    // TODO: Use an actual module system
+    // TODO: This is a hack while the module system is not finished
     program_source.push_str(stdlib::STDLIB);
-    let tokens = tokenize_string(&program_source)?;
+
     println!("Parsing program...");
-    let program = parse_program(tokens)?;
-    println!("{program}");
+    let mut program = Program::new();
+    for source_text in vec![program_source.as_str(), stdlib::STDLIB] {
+        let tokens = tokenize_string(source_text)?;
+        let module = parse_module(tokens)?;
+        program.modules.push(module);
+    }
+
+    for (i, module) in program.modules.iter().enumerate() {
+        println!("Module {}", i);
+        for func in module.functions.iter() {
+            println!("    fn {}(...);", func.name);
+        }
+        for extern_ in module.externs.iter() {
+            println!("    extern fn {}(...);", extern_.name);
+        }
+        println!();
+    }
+
+    // println!("{}", &program);
 
     println!("Type checking program...");
-    let typed_program = check_program(&program)?;
-    // println!("{:#?}", typed_program.functions[0].body[0]);
-    println!("{typed_program}");
+    let _typed_program = check_program(&program)?;
+    // println!("{typed_program}");
 
     println!("Compiling program...");
+    // TODO: this should take in the typed program
     let ir_program = compile_program(&program)?;
-    println!("{ir_program}");
+    // println!("{ir_program}");
 
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
     let input_basename = input_path

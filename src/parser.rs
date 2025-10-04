@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 
 use crate::{
     ast::{
-        Expr, ExprWithLoc, Function, IdWithLoc, ParamList, Program, Statement,
+        Expr, ExprWithLoc, Function, IdWithLoc, Module, ParamList, Statement,
         StatementWithLoc, Type, TypeWithLoc,
     },
     lexer::{
@@ -576,7 +576,7 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
 }
 
 #[allow(dead_code)]
-pub fn parse_program(tokens: Vec<TokenWithLoc>) -> Result<Program, String> {
+pub fn parse_module(tokens: Vec<TokenWithLoc>) -> Result<Module, String> {
     let mut p = Parser::new(tokens);
     let mut functions = Vec::new();
     let mut externs = Vec::new();
@@ -603,7 +603,7 @@ pub fn parse_program(tokens: Vec<TokenWithLoc>) -> Result<Program, String> {
             }
         }
     }
-    Ok(Program { functions, externs })
+    Ok(Module { functions, externs })
 }
 
 #[cfg(test)]
@@ -633,7 +633,7 @@ fn foo(a: int64, b: int64, c: int64) -> int64 {
     #[test]
     fn test_parse_program() {
         let tokens = tokenize_string(PARSING_TEST_PROGRAM).expect("tokenize");
-        let program = parse_program(tokens).expect("parse");
+        let program = parse_module(tokens).expect("parse");
         assert!(!program.functions.is_empty());
         // TODO: assert exact AST output
     }

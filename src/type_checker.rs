@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        Expr, ExprWithLoc, Function, IdWithLoc, Program, Statement,
+        Expr, ExprWithLoc, Function, IdWithLoc, Module, Program, Statement,
         StatementWithLoc, Type as AstType, TypeWithLoc,
     },
     lexer::{Binop, Primative, Uniop},
     typed_ast::{
-        TypedExpr, TypedExprKind, TypedFunction, TypedProgram, TypedStatement,
-        TypedStatementKind,
+        TypedExpr, TypedExprKind, TypedFunction, TypedModule, TypedProgram,
+        TypedStatement, TypedStatementKind,
     },
     types::{FuncType, Type},
 };
@@ -20,7 +20,7 @@ struct TypeCheckerContext {
 }
 
 impl TypeCheckerContext {
-    fn new(program: &Program) -> Result<Self, String> {
+    fn new(program: &Module) -> Result<Self, String> {
         // Structs will be handled before here so they will be
         // available for function headers
         let mut ctx = Self {
@@ -695,16 +695,27 @@ fn check_function(
     })
 }
 
-pub fn check_program(program: &Program) -> Result<TypedProgram, String> {
-    let mut ctx = TypeCheckerContext::new(&program)?;
+pub fn check_module(module: &Module) -> Result<TypedModule, String> {
+    let mut ctx = TypeCheckerContext::new(&module)?;
     let mut typed_functions = Vec::new();
-    for function in &program.functions {
+    for function in &module.functions {
         ctx.func.reset_with_name(function.name.id.clone());
         let typed_function = check_function(&function, &mut ctx)?;
         typed_functions.push(typed_function);
-        println!("{:#?}", ctx.func);
+        // println!("{:#?}", ctx.func);
     }
-    Ok(TypedProgram {
+    Ok(TypedModule {
         functions: typed_functions,
     })
+}
+
+pub fn check_program(program: &Program) -> Result<TypedProgram, String> {
+    // let mut ctx = TypeCheckerContext::new(&program)?;
+    let mut typed_program = TypedProgram::new();
+    for module in &program.modules {
+        // ctx.func.reset_with_name(module.name.id.clone());
+        let typed_module = check_module(&module)?;
+        typed_program.modules.push(typed_module);
+    }
+    Ok(typed_program)
 }

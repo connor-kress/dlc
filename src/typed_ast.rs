@@ -296,14 +296,36 @@ impl fmt::Display for TypedFunction {
 }
 
 #[derive(Debug, Clone)]
-pub struct TypedProgram {
+pub struct TypedModule {
     pub functions: Vec<TypedFunction>,
+}
+
+impl fmt::Display for TypedModule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for function in &self.functions {
+            write!(f, "{function}\n\n")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TypedProgram {
+    pub modules: Vec<TypedModule>,
+}
+
+impl TypedProgram {
+    pub fn new() -> Self {
+        Self {
+            modules: Vec::new(),
+        }
+    }
 }
 
 impl fmt::Display for TypedProgram {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for function in &self.functions {
-            write!(f, "{function}\n\n")?;
+        for module in &self.modules {
+            write!(f, "{module}\n\n")?;
         }
         Ok(())
     }

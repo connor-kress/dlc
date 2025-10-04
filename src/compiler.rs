@@ -1,5 +1,8 @@
 use crate::{
-    ast::{Expr, ExprWithLoc, Function, Program, Statement, StatementWithLoc},
+    ast::{
+        Expr, ExprWithLoc, Function, Module, Program, Statement,
+        StatementWithLoc,
+    },
     ir::{Arg, IRFunction, IRProgram, Op},
     lexer::{Binop, Loc, Primative, Uniop},
 };
@@ -453,34 +456,43 @@ fn compile_function(
     Ok(ir_func)
 }
 
-pub fn compile_program(program: &Program) -> Result<IRProgram, String> {
+pub fn compile_module(module: &Module) -> Result<IRProgram, String> {
     let mut proc_ctx = ProgramContext::new();
     let mut ir_funcs = Vec::new();
-    for func in program.functions.iter() {
+    for func in module.functions.iter() {
         let ir_func = compile_function(func, &mut proc_ctx)?;
         ir_funcs.push(ir_func);
     }
-    let program = IRProgram {
+    let ir_program = IRProgram {
         functions: ir_funcs,
         string_literals: proc_ctx.string_literals,
     };
-    Ok(program)
+    Ok(ir_program)
+}
+
+pub fn compile_program(program: &Program) -> Result<IRProgram, String> {
+    let mut ir_modules = Vec::new();
+    for module in program.modules.iter() {
+        let ir_module = compile_module(module)?;
+        ir_modules.push(ir_module);
+    }
+    Ok(ir_modules.get(0).expect("no modules").clone())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::lexer::tokenize_string;
-    use crate::parser::parse_program;
+    use crate::parser::parse_module;
 
     static PROGRAM: &str = r#"
-fn foo(a: int64, b: int64, c: int64) -> int64 {
+fn foo(a: i32, b: i32, c: i32) -> i32 {
     let res = a + 2;
     res += c;
     return res;
 }
 
-fn main(argc: int64, argv: **char) -> int64 {
+fn main(argc: u64, argv: **u8) -> i32 {
     let x = 100;
     x -= 10*3;
     x /= 3;
@@ -492,8 +504,8 @@ fn main(argc: int64, argv: **char) -> int64 {
     #[test]
     fn test_compile_program() {
         let tokens = tokenize_string(PROGRAM).expect("tokenize");
-        let functions = parse_program(tokens).expect("parse");
-        let ir = compile_program(&functions).expect("compile");
+        let functions = parse_module(tokens).expect("parse");
+        let ir = compile_module(&functions).expect("compile");
         assert!(!ir.functions.is_empty());
         // TODO: assert exact IR output
     }
