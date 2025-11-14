@@ -1,22 +1,22 @@
 fn main() -> i32 {
     let name = malloc(100u64) as *u8;
-    let age: i32;
     printf("Enter a name: ");
     if scanf("%99s", name) == 0 {
         printf("Error reading input.\n");
-        free(name as *void);
+        free(name);
         return 1i32;
     }
     if strcmp(name, "secret-code") == 0i32 {
         printf("Congratulations! You found the secret code!\n");
     }
+    let age: i32;
     printf("Enter an age: ");
     if scanf("%d", &age) == 0 {
         printf("Error reading input.\n");
-        free(name as *void);
+        free(name);
         return 1i32;
     }
     printf("\n%s is %d years old.\n", name, age);
-    free(name as *void);
+    free(name);
     return 0i32;
 }

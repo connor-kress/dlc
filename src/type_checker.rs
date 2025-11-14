@@ -173,6 +173,10 @@ fn can_implicit_cast(from: &Type, to: &Type) -> bool {
                 t == f
             }
         }
+        (Type::Ptr(f), Type::Ptr(t)) => {
+            // Any pointer can be cast to a void pointer
+            f == t || matches!(**t, Type::Primitive(Primative::Void))
+        }
         _ => from == to,
     }
 }

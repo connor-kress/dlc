@@ -38,7 +38,7 @@ fn main() -> i32 {
     while n <= max_length {
         let arr = gen_array(n);
         print_array(arr, n);
-        free(arr as *void);
+        free(arr);
         n += 1u64;
     }
     return 0;
