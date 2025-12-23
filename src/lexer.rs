@@ -25,6 +25,8 @@ impl Loc {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Primative {
+    Void,
+    Bool,
     Int8,
     Int16,
     Int32,
@@ -35,30 +37,28 @@ pub enum Primative {
     Uint64,
     Float32,
     Float64,
-    Bool,
-    Void,
 }
 
 #[allow(dead_code)]
 impl Primative {
-    pub fn is_bool(&self) -> bool {
-        matches!(self, Primative::Bool)
+    pub fn bits(&self) -> u8 {
+        use Primative as P;
+        match self {
+            P::Void => 0,
+            P::Bool => 1,
+            P::Int8 | P::Uint8 => 8,
+            P::Int16 | P::Uint16 => 16,
+            P::Int32 | P::Uint32 | P::Float32 => 32,
+            P::Int64 | P::Uint64 | P::Float64 => 64,
+        }
     }
 
     pub fn is_void(&self) -> bool {
         matches!(self, Primative::Void)
     }
 
-    pub fn bits(&self) -> u8 {
-        use Primative as P;
-        match self {
-            P::Int8 | P::Uint8 => 8,
-            P::Int16 | P::Uint16 => 16,
-            P::Int32 | P::Uint32 | P::Float32 => 32,
-            P::Int64 | P::Uint64 | P::Float64 => 64,
-            P::Bool => 1,
-            P::Void => 0,
-        }
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Primative::Bool)
     }
 
     pub fn is_sint(&self) -> bool {
@@ -71,7 +71,6 @@ impl Primative {
         matches!(self, P::Uint8 | P::Uint16 | P::Uint32 | P::Uint64)
     }
 
-    #[inline]
     pub fn is_int(&self) -> bool {
         self.is_sint() || self.is_uint()
     }
@@ -81,7 +80,6 @@ impl Primative {
         matches!(self, P::Float32 | P::Float64)
     }
 
-    #[inline]
     pub fn is_arithmetic(&self) -> bool {
         self.is_int() || self.is_float()
     }
@@ -285,6 +283,8 @@ static OPERATOR_LIKE_TOKENS: LazyLock<HashMap<&'static str, Token>> =
 pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
     LazyLock::new(|| {
         HashMap::from([
+            ("void", Primative::Void),
+            ("bool", Primative::Bool),
             ("i8", Primative::Int8),
             ("i16", Primative::Int16),
             ("i32", Primative::Int32),
@@ -296,8 +296,6 @@ pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
             ("char", Primative::Int8),
             ("f32", Primative::Float32),
             ("f64", Primative::Float64),
-            ("bool", Primative::Bool),
-            ("void", Primative::Void),
         ])
     });
 
@@ -577,7 +575,6 @@ fn get_next_token(l: &mut Lexer) -> Result<Option<TokenWithLoc>, String> {
     Ok(Some(token))
 }
 
-#[allow(dead_code)]
 pub fn tokenize_string(s: &str) -> Result<Vec<TokenWithLoc>, String> {
     let mut l = Lexer::new(s);
     let mut tokens = Vec::new();

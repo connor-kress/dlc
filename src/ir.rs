@@ -169,18 +169,43 @@ impl fmt::Display for IRFunction {
 }
 
 #[derive(Clone, Debug)]
-pub struct IRProgram {
+pub struct IRModule {
     pub functions: Vec<IRFunction>,
     pub string_literals: Vec<String>,
 }
 
-impl fmt::Display for IRProgram {
+impl fmt::Display for IRModule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, func) in self.functions.iter().enumerate() {
             if i != 0 {
                 write!(f, "\n")?;
             }
             writeln!(f, "{func}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IRProgram {
+    pub modules: Vec<IRModule>,
+}
+
+impl IRProgram {
+    pub fn new() -> Self {
+        Self {
+            modules: Vec::new(),
+        }
+    }
+}
+
+impl fmt::Display for IRProgram {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, module) in self.modules.iter().enumerate() {
+            if i != 0 {
+                write!(f, "\n")?;
+            }
+            writeln!(f, "{module}")?;
         }
         Ok(())
     }

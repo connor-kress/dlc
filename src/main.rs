@@ -9,16 +9,16 @@ mod type_checker;
 mod typed_ast;
 mod types;
 
-use codegen::emit_program;
-use compiler::compile_program;
-use lexer::tokenize_string;
-use parser::parse_module;
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+};
 
-use crate::ast::Program;
-use crate::type_checker::check_program;
+use crate::{
+    ast::Program, codegen::emit_program, compiler::compile_program,
+    lexer::tokenize_string, parser::parse_module, type_checker::check_program,
+};
 
 fn assemble_and_link_program(
     asm_filename: &Path,
@@ -35,7 +35,7 @@ fn assemble_and_link_program(
         .arg("-o")
         .arg(obj_filename)
         .output()
-        .map_err(|e| format!("Failed to execute assembler ('as'): {}", e))?;
+        .map_err(|e| format!("Failed to execute assembler ('as'): {e}"))?;
 
     if !assemble_output.status.success() {
         return Err(format!(
@@ -56,7 +56,7 @@ fn assemble_and_link_program(
         .arg("-o")
         .arg(exe_filename)
         .output()
-        .map_err(|e| format!("Failed to execute linker ('cc'): {}", e))?;
+        .map_err(|e| format!("Failed to execute linker ('cc'): {e}"))?;
 
     if !link_output.status.success() {
         return Err(format!(
@@ -92,7 +92,7 @@ fn run_executable(exe_path: &Path) -> Result<(), String> {
             println!("Program exited normally with code 0.");
         }
         Some(code) => {
-            println!("Program exited with error code {}.", code);
+            println!("Program exited with error code {code}.");
         }
         None => {
             println!("Program terminated by signal.");
@@ -129,7 +129,7 @@ fn parse_cli_args() -> Result<CliOptions, String> {
                 i += 2;
             }
             s if s.starts_with('-') => {
-                return Err(format!("Unknown flag: {}", s));
+                return Err(format!("Unknown flag: {s}"));
             }
             _ => {
                 input_files.push(PathBuf::from(&args[i]));
@@ -173,24 +173,25 @@ fn parse_cli_args() -> Result<CliOptions, String> {
 fn main() -> Result<(), String> {
     let cli = parse_cli_args()?;
 
-    let input_path = &cli.input_files[0];
-    let mut program_source =
-        std::fs::read_to_string(input_path).map_err(|e| {
-            format!("Failed to read file '{}': {}", input_path.display(), e)
-        })?;
-    // TODO: This is a hack while the module system is not finished
-    program_source.push_str(stdlib::STDLIB);
+    let mut source_texts = vec![stdlib::STDLIB.to_string()];
+    for input_path in cli.input_files.iter() {
+        source_texts.push(std::fs::read_to_string(input_path).map_err(
+            |e| {
+                format!("Failed to read file '{}': {}", input_path.display(), e)
+            },
+        )?);
+    }
 
     println!("Parsing program...");
     let mut program = Program::new();
-    for source_text in vec![program_source.as_str(), stdlib::STDLIB] {
+    for source_text in source_texts.iter() {
         let tokens = tokenize_string(source_text)?;
         let module = parse_module(tokens)?;
         program.modules.push(module);
     }
 
     for (i, module) in program.modules.iter().enumerate() {
-        println!("Module {}", i);
+        println!("Module {i}");
         for func in module.functions.iter() {
             println!("    fn {}(...);", func.name);
         }
@@ -211,16 +212,18 @@ fn main() -> Result<(), String> {
     let ir_program = compile_program(&program)?;
     // println!("{ir_program}");
 
-    let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
-    let input_basename = input_path
+    let entry_input_path = &cli.input_files[0]; // TODO: dynamically find entry
+    let parent_dir =
+        entry_input_path.parent().unwrap_or_else(|| Path::new("."));
+    let input_basename = entry_input_path
         .file_stem()
         .and_then(|s| s.to_str())
         .map(|s| s.to_string())
-        .unwrap_or_else(|| input_path.to_string_lossy().to_string());
-    let asm_filename = parent_dir.join(format!("{}.s", input_basename));
-    let obj_filename = parent_dir.join(format!("{}.o", input_basename));
+        .unwrap_or_else(|| entry_input_path.to_string_lossy().to_string());
+    let asm_filename = parent_dir.join(format!("{input_basename}.s"));
+    let obj_filename = parent_dir.join(format!("{input_basename}.o"));
     let mut file = File::create(&asm_filename)
-        .map_err(|e| format!("Failed to create file: {}", e))?;
+        .map_err(|e| format!("Failed to create file: {e}"))?;
     emit_program(&ir_program, &mut file)?;
 
     assemble_and_link_program(&asm_filename, &obj_filename, &cli.output_path)?;

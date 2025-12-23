@@ -379,6 +379,7 @@ impl fmt::Display for Function {
 
 #[derive(Debug, Clone)]
 pub struct Module {
+    // pub name_buf: Vec<String>, // TODO: use this to store module name
     pub functions: Vec<Function>,
     pub externs: Vec<Function>, // no function bodies
 }

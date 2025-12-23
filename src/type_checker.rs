@@ -13,50 +13,66 @@ use crate::{
     types::{FuncType, Type},
 };
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
-struct TypeCheckerContext {
-    functions: HashMap<String, FuncType>,
-    func: TypeCheckerFunctionContext,
+struct AnalyzerProgramContext {
+    // TODO: add module names/paths
+    modules: Vec<AnalyzerModuleContext>,
 }
 
-impl TypeCheckerContext {
-    fn new(program: &Module) -> Result<Self, String> {
+#[allow(dead_code)]
+impl AnalyzerProgramContext {
+    fn new(_program: &Program) -> Result<Self, String> {
+        todo!("AnalyzerProgramContext::new()")
+    }
+}
+
+#[derive(Clone, Debug)]
+struct AnalyzerModuleContext {
+    functions: HashMap<String, FuncType>,
+    func: AnalyzerFunctionContext,
+}
+
+impl AnalyzerModuleContext {
+    fn new() -> Self {
         // Structs will be handled before here so they will be
         // available for function headers
-        let mut ctx = Self {
+        Self {
             functions: HashMap::new(),
-            func: TypeCheckerFunctionContext::new(),
-        };
-        for func in &program.functions {
+            func: AnalyzerFunctionContext::new(),
+        }
+    }
+
+    fn init(&mut self, module: &Module) -> Result<(), String> {
+        for func in &module.functions {
             let mut params = Vec::new();
             for (id, type_) in &func.param_list.params {
-                params
-                    .push((id.id.clone(), convert_ast_type(&type_, &mut ctx)?));
+                params.push((id.id.clone(), convert_ast_type(&type_, self)?));
             }
             let func_type = FuncType {
                 params,
                 is_variadic: func.is_variadic,
-                ret_type: Box::new(convert_ast_type(&func.ret_type, &mut ctx)?),
+                ret_type: Box::new(convert_ast_type(&func.ret_type, self)?),
             };
-            ctx.functions.insert(func.name.id.clone(), func_type);
+            self.functions.insert(func.name.id.clone(), func_type);
         }
-        for extern_func in &program.externs {
+        for extern_func in &module.externs {
             let mut params = Vec::new();
             for (id, type_) in &extern_func.param_list.params {
-                params
-                    .push((id.id.clone(), convert_ast_type(&type_, &mut ctx)?));
+                params.push((id.id.clone(), convert_ast_type(&type_, self)?));
             }
             let func_type = FuncType {
                 params,
                 is_variadic: extern_func.is_variadic,
                 ret_type: Box::new(convert_ast_type(
                     &extern_func.ret_type,
-                    &mut ctx,
+                    self,
                 )?),
             };
-            ctx.functions.insert(extern_func.name.id.clone(), func_type);
+            self.functions
+                .insert(extern_func.name.id.clone(), func_type);
         }
-        Ok(ctx)
+        Ok(())
     }
 
     fn get_func_type(&self, name: &str) -> Option<FuncType> {
@@ -82,12 +98,12 @@ impl TypeCheckerContext {
 }
 
 #[derive(Clone, Debug)]
-struct TypeCheckerFunctionContext {
+struct AnalyzerFunctionContext {
     locals: HashMap<String, Type>,
     func_name: Option<String>,
 }
 
-impl<'a> TypeCheckerFunctionContext {
+impl<'a> AnalyzerFunctionContext {
     fn new() -> Self {
         Self {
             locals: HashMap::new(),
@@ -111,7 +127,7 @@ impl<'a> TypeCheckerFunctionContext {
 
 fn convert_ast_type(
     ty: &TypeWithLoc,
-    ctx: &mut TypeCheckerContext,
+    ctx: &mut AnalyzerModuleContext,
 ) -> Result<Type, String> {
     Ok(match &ty.type_ {
         AstType::Primitive(ty) => Type::Primitive(*ty),
@@ -122,7 +138,7 @@ fn convert_ast_type(
 
 fn find_type_of_id(
     id: &IdWithLoc,
-    ctx: &mut TypeCheckerContext,
+    ctx: &mut AnalyzerModuleContext,
 ) -> Result<Type, String> {
     if let Some(ty) = ctx.func.get_local(&id.id) {
         Ok(ty.clone())
@@ -290,7 +306,7 @@ fn get_uniop_type(op: &Uniop, arg: &Type) -> Result<Type, String> {
 
 fn check_expr(
     expr: &ExprWithLoc,
-    ctx: &mut TypeCheckerContext,
+    ctx: &mut AnalyzerModuleContext,
 ) -> Result<TypedExpr, String> {
     Ok(match &expr.expr {
         Expr::Id(id) => TypedExpr {
@@ -451,7 +467,7 @@ fn check_expr(
 
 fn check_statement(
     statement: &StatementWithLoc,
-    ctx: &mut TypeCheckerContext,
+    ctx: &mut AnalyzerModuleContext,
 ) -> Result<(TypedStatement, bool), String> {
     let mut did_ret = false;
     let typed_statement = match &statement.statement {
@@ -661,7 +677,7 @@ fn check_statement(
 
 fn check_function(
     function: &Function,
-    ctx: &mut TypeCheckerContext,
+    ctx: &mut AnalyzerModuleContext,
 ) -> Result<TypedFunction, String> {
     for (param, type_) in &function.param_list.params {
         let ty = convert_ast_type(&type_, ctx)?;
@@ -699,12 +715,18 @@ fn check_function(
     })
 }
 
-pub fn check_module(module: &Module) -> Result<TypedModule, String> {
-    let mut ctx = TypeCheckerContext::new(&module)?;
+fn check_module(
+    module: &Module,
+    ctx: &mut AnalyzerModuleContext,
+) -> Result<TypedModule, String> {
+    ctx.init(module)?; // Temporarily keep initializing with the same context
+                       // This keeps the old context in scope
+
+    // let mut ctx = AnalyzerModuleContext::new(&module)?;
     let mut typed_functions = Vec::new();
     for function in &module.functions {
         ctx.func.reset_with_name(function.name.id.clone());
-        let typed_function = check_function(&function, &mut ctx)?;
+        let typed_function = check_function(&function, ctx)?;
         typed_functions.push(typed_function);
         // println!("{:#?}", ctx.func);
     }
@@ -713,12 +735,16 @@ pub fn check_module(module: &Module) -> Result<TypedModule, String> {
     })
 }
 
+#[allow(dead_code)]
 pub fn check_program(program: &Program) -> Result<TypedProgram, String> {
-    // let mut ctx = TypeCheckerContext::new(&program)?;
+    // TODO: actual import resolution and module ordering (+ cycle detection)
+    // We currently ensure that the first module is the standard library as the
+    // order matters
+    let mut ctx = AnalyzerModuleContext::new();
     let mut typed_program = TypedProgram::new();
     for module in &program.modules {
         // ctx.func.reset_with_name(module.name.id.clone());
-        let typed_module = check_module(&module)?;
+        let typed_module = check_module(&module, &mut ctx)?;
         typed_program.modules.push(typed_module);
     }
     Ok(typed_program)

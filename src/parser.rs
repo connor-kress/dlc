@@ -631,7 +631,7 @@ fn foo(a: int64, b: int64, c: int64) -> int64 {
 "#;
 
     #[test]
-    fn test_parse_program() {
+    fn test_parse_module() {
         let tokens = tokenize_string(PARSING_TEST_PROGRAM).expect("tokenize");
         let program = parse_module(tokens).expect("parse");
         assert!(!program.functions.is_empty());

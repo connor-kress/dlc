@@ -3,7 +3,7 @@ use crate::{
         Expr, ExprWithLoc, Function, Module, Program, Statement,
         StatementWithLoc,
     },
-    ir::{Arg, IRFunction, IRProgram, Op},
+    ir::{Arg, IRFunction, IRModule, IRProgram, Op},
     lexer::{Binop, Loc, Primative, Uniop},
 };
 
@@ -456,14 +456,14 @@ fn compile_function(
     Ok(ir_func)
 }
 
-pub fn compile_module(module: &Module) -> Result<IRProgram, String> {
+pub fn compile_module(module: &Module) -> Result<IRModule, String> {
     let mut proc_ctx = ProgramContext::new();
     let mut ir_funcs = Vec::new();
     for func in module.functions.iter() {
         let ir_func = compile_function(func, &mut proc_ctx)?;
         ir_funcs.push(ir_func);
     }
-    let ir_program = IRProgram {
+    let ir_program = IRModule {
         functions: ir_funcs,
         string_literals: proc_ctx.string_literals,
     };
@@ -471,12 +471,12 @@ pub fn compile_module(module: &Module) -> Result<IRProgram, String> {
 }
 
 pub fn compile_program(program: &Program) -> Result<IRProgram, String> {
-    let mut ir_modules = Vec::new();
+    let mut ir_program = IRProgram::new();
     for module in program.modules.iter() {
         let ir_module = compile_module(module)?;
-        ir_modules.push(ir_module);
+        ir_program.modules.push(ir_module);
     }
-    Ok(ir_modules.get(0).expect("no modules").clone())
+    Ok(ir_program)
 }
 
 #[cfg(test)]

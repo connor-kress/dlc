@@ -1,5 +1,5 @@
 use crate::{
-    ir::{Arg, IRFunction, IRProgram, Op},
+    ir::{Arg, IRFunction, IRModule, IRProgram, Op},
     lexer::{Binop, Uniop},
 };
 
@@ -251,14 +251,13 @@ pub fn emit_function<W: std::io::Write>(
     Ok(())
 }
 
-/// Generate an x86_64 assembly program from an IR program.
-pub fn emit_program<W: std::io::Write>(
-    program: &IRProgram,
+pub fn emit_module<W: std::io::Write>(
+    module: &IRModule,
     out: &mut W,
 ) -> Result<(), String> {
-    if !program.string_literals.is_empty() {
+    if !module.string_literals.is_empty() {
         writeln!(out, ".section .rodata").unwrap();
-        for (i, str_lit) in program.string_literals.iter().enumerate() {
+        for (i, str_lit) in module.string_literals.iter().enumerate() {
             writeln!(out, ".STR{i}:").unwrap();
             writeln!(out, "    .string {str_lit:?}").unwrap();
         }
@@ -266,11 +265,25 @@ pub fn emit_program<W: std::io::Write>(
     }
 
     write!(out, ".text\n\n").unwrap();
-    for (i, func) in program.functions.iter().enumerate() {
+    for (i, func) in module.functions.iter().enumerate() {
         if i != 0 {
             write!(out, "\n").unwrap();
         }
         emit_function(func, out)?;
+    }
+    Ok(())
+}
+
+/// Generate an x86_64 assembly program from an IR program.
+pub fn emit_program<W: std::io::Write>(
+    program: &IRProgram,
+    out: &mut W,
+) -> Result<(), String> {
+    for (i, module) in program.modules.iter().enumerate() {
+        if i != 0 {
+            write!(out, "\n").unwrap();
+        }
+        emit_module(module, out)?;
     }
     Ok(())
 }
