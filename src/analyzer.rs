@@ -304,6 +304,37 @@ fn get_uniop_type(op: &Uniop, arg: &Type) -> Result<Type, String> {
     })
 }
 
+pub fn extract_symbol_path(
+    expr: &Expr,
+) -> Result<(Vec<String>, String), String> {
+    let mut acc = expr;
+    let mut path = Vec::<String>::new();
+    loop {
+        match acc {
+            Expr::Binop {
+                op: Binop::Resolution,
+                left: new_acc,
+                right: new_val,
+            } => {
+                acc = &new_acc.expr;
+                let Expr::Id(val) = &new_val.expr else {
+                    return Err(format!("Invalid identifier: `{new_val}`"));
+                };
+                path.insert(0, val.clone().id);
+            }
+            Expr::Id(final_val) => {
+                path.insert(0, final_val.clone().id);
+                break;
+            }
+            _ => {
+                return Err(format!("Invalid identifier: `{acc}`"));
+            }
+        }
+    }
+    let val = path.pop().expect("There should always be at least one");
+    Ok((path, val))
+}
+
 fn check_expr(
     expr: &ExprWithLoc,
     ctx: &mut AnalyzerModuleContext,
@@ -375,24 +406,26 @@ fn check_expr(
         }
 
         Expr::FuncCall { name, args } => {
-            let Expr::Id(id) = &name.expr else {
-                return Err(format!("Invalid function name: `{}`", name.expr));
-            };
-            let Some(func_type) = ctx.get_func_type(&id.id) else {
-                return Err(format!("Undefined function `{}`", id.id));
+            // TODO: function pointers
+            let (path, id) = extract_symbol_path(&name.expr)?;
+            if !path.is_empty() {
+                todo!("Scope resolution: {path:?}::{id}");
+            }
+            let Some(func_type) = ctx.get_func_type(&id) else {
+                return Err(format!("Undefined function `{id}`"));
             };
             if func_type.is_variadic {
                 if args.len() < func_type.params.len() {
                     return Err(format!(
                         "Invalid number of arguments for variadic function `{}`: {}+ expected, {} provided",
-                        id.id, func_type.params.len(), args.len()
+                        id, func_type.params.len(), args.len()
                     ));
                 }
             } else {
                 if args.len() != func_type.params.len() {
                     return Err(format!(
                         "Invalid number of arguments for function `{}`: {} expected, {} provided",
-                        id.id, func_type.params.len(), args.len()
+                        id, func_type.params.len(), args.len()
                     ));
                 }
             }
@@ -405,7 +438,7 @@ fn check_expr(
                 if !can_implicit_cast(&arg.ty, &param.1) {
                     return Err(format!(
                         "Invalid argument type for function `{}`: expected `{}`, got `{}`",
-                        id.id, param.1, arg.ty
+                        id, param.1, arg.ty
                     ));
                 }
             }

@@ -1,4 +1,5 @@
 use crate::{
+    analyzer::extract_symbol_path,
     ast::{
         Expr, ExprWithLoc, Function, Module, Program, Statement,
         StatementWithLoc,
@@ -292,13 +293,14 @@ fn compile_expr(
             for arg in args.iter() {
                 ir_args.push(compile_expr(arg, fn_ctx, proc_ctx)?);
             }
-            let Expr::Id(name) = &name.expr else {
-                // TODO: function pointers
-                return Err(format!("Invalid function name: `{}`", name.expr));
-            };
+            // TODO: function pointers
+            let (path, name) = extract_symbol_path(&name.expr)?;
+            if !path.is_empty() {
+                todo!("Scope resolution: {path:?}::{name}");
+            }
             let index = fn_ctx.add_tmp_local();
             fn_ctx.ops.push(Op::FuncCall {
-                func: name.id.clone(),
+                func: name.clone(),
                 ret: index,
                 args: ir_args.clone(),
             });

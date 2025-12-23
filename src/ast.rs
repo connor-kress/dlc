@@ -378,10 +378,28 @@ impl fmt::Display for Function {
 }
 
 #[derive(Debug, Clone)]
+pub struct ImportStatement {
+    pub path: Vec<IdWithLoc>,
+    pub loc: Loc,
+}
+
+#[derive(Debug, Clone)]
 pub struct Module {
+    /// Namespaces and functions that are imported (TODO: constants, types)
+    pub imports: Vec<ImportStatement>,
     // pub name_buf: Vec<String>, // TODO: use this to store module name
     pub functions: Vec<Function>,
     pub externs: Vec<Function>, // no function bodies
+}
+
+impl Module {
+    pub fn new() -> Self {
+        Self {
+            imports: Vec::new(),
+            functions: Vec::new(),
+            externs: Vec::new(),
+        }
+    }
 }
 
 impl fmt::Display for Module {

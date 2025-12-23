@@ -2,8 +2,8 @@ use std::cmp::{max, min};
 
 use crate::{
     ast::{
-        Expr, ExprWithLoc, Function, IdWithLoc, Module, ParamList, Statement,
-        StatementWithLoc, Type, TypeWithLoc,
+        Expr, ExprWithLoc, Function, IdWithLoc, ImportStatement, Module,
+        ParamList, Statement, StatementWithLoc, Type, TypeWithLoc,
     },
     lexer::{
         Binop, Loc, Primative, Token, TokenWithLoc, Uniop, PRIMITIVE_TYPES,
@@ -28,6 +28,7 @@ impl Binop {
     // Everything shifted by one to account for the `as` operator
     fn precedence(&self) -> usize {
         match self {
+            Binop::Resolution => 1,
             Binop::Mul | Binop::Div => 4,
             Binop::Add | Binop::Sub => 5,
             Binop::Lt | Binop::Le | Binop::Gt | Binop::Ge => 7,
@@ -575,17 +576,30 @@ fn parse_function(p: &mut Parser) -> Result<Function, String> {
     Ok(function)
 }
 
-#[allow(dead_code)]
+fn parse_import(p: &mut Parser) -> Result<Vec<ImportStatement>, String> {
+    let start = p.expect_token(Token::Use)?.loc.start;
+    let mut path = vec![p.expect_id()?];
+    while p.peek_token()?.token != Token::Semi {
+        p.expect_token(Token::Binop(Binop::Resolution))?;
+        path.push(p.expect_id()?);
+    }
+    let end = p.expect_token(Token::Semi)?.loc.end;
+    let import = ImportStatement {
+        path,
+        loc: Loc::new(start, end),
+    };
+    Ok(vec![import])
+}
+
 pub fn parse_module(tokens: Vec<TokenWithLoc>) -> Result<Module, String> {
     let mut p = Parser::new(tokens);
-    let mut functions = Vec::new();
-    let mut externs = Vec::new();
+    let mut module = Module::new();
     while !p.at_end() {
         let peek = p.peek_token()?;
         match peek.token {
             Token::Fn => {
                 let function = parse_function(&mut p)?;
-                functions.push(function);
+                module.functions.push(function);
             }
             Token::Extern => {
                 let extern_start = p.expect_token(Token::Extern)?.loc.start;
@@ -593,7 +607,11 @@ pub fn parse_module(tokens: Vec<TokenWithLoc>) -> Result<Module, String> {
                 let extern_end = p.expect_token(Token::Semi)?.loc.end;
                 header.loc.start = extern_start;
                 header.loc.end = extern_end;
-                externs.push(header);
+                module.externs.push(header);
+            }
+            Token::Use => {
+                let import = parse_import(&mut p)?;
+                module.imports.extend(import);
             }
             _ => {
                 return Err(format!(
@@ -603,7 +621,7 @@ pub fn parse_module(tokens: Vec<TokenWithLoc>) -> Result<Module, String> {
             }
         }
     }
-    Ok(Module { functions, externs })
+    Ok(module)
 }
 
 #[cfg(test)]

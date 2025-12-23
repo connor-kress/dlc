@@ -115,6 +115,7 @@ pub enum Token {
     Return,
     Extern,
     As,
+    Use,
 
     // Literals
     StrLit(String),
@@ -157,6 +158,7 @@ pub enum Binop {
     BitOr,
     BitAnd,
     BitXor,
+    Resolution,
 }
 
 impl Binop {
@@ -210,7 +212,6 @@ static SINGLE_CHAR_TOKENS: LazyLock<HashMap<char, Token>> =
             ('{', Token::Lcurly),
             ('}', Token::Rcurly),
             (',', Token::Comma),
-            (':', Token::Colon),
             (';', Token::Semi),
         ])
     });
@@ -218,6 +219,7 @@ static SINGLE_CHAR_TOKENS: LazyLock<HashMap<char, Token>> =
 static OPERATOR_CHARS: LazyLock<HashSet<char>> = LazyLock::new(|| {
     HashSet::from([
         '+', '-', '*', '/', '%', '|', '&', '^', '~', '!', '=', '<', '>', '.',
+        ':',
     ])
 });
 
@@ -232,6 +234,7 @@ static KEYWORDS: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
         ("return", Token::Return),
         ("extern", Token::Extern),
         ("as", Token::As),
+        ("use", Token::Use),
         ("true", Token::BoolLit(true)),
         ("false", Token::BoolLit(false)),
     ])
@@ -277,7 +280,12 @@ static UNARY_OPS: LazyLock<HashMap<&'static str, Uniop>> =
 
 static OPERATOR_LIKE_TOKENS: LazyLock<HashMap<&'static str, Token>> =
     LazyLock::new(|| {
-        HashMap::from([("...", Token::Dots), ("->", Token::ThinArrow)])
+        HashMap::from([
+            ("...", Token::Dots),
+            ("->", Token::ThinArrow),
+            (":", Token::Colon),
+            ("::", Token::Binop(Binop::Resolution)),
+        ])
     });
 
 pub static PRIMITIVE_TYPES: LazyLock<HashMap<&'static str, Primative>> =
