@@ -1,3 +1,4 @@
+mod analyzer;
 mod ast;
 mod codegen;
 mod compiler;
@@ -5,7 +6,6 @@ mod ir;
 mod lexer;
 mod parser;
 mod stdlib;
-mod type_checker;
 mod typed_ast;
 mod types;
 
@@ -16,8 +16,8 @@ use std::{
 };
 
 use crate::{
-    ast::Program, codegen::emit_program, compiler::compile_program,
-    lexer::tokenize_string, parser::parse_module, type_checker::check_program,
+    analyzer::check_program, ast::Program, codegen::emit_program,
+    compiler::compile_program, lexer::tokenize_string, parser::parse_module,
 };
 
 fn assemble_and_link_program(
